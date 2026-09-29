@@ -17,3 +17,7 @@ The site brand in the header, footer, checkout text, account pages, metadata, an
 The Info page now links to official publisher product and card resources. Inherited dated news claims and an API that copied another store's card-list HTML were removed. The owner's TCG archive contains mock prices and stock, so no bulk catalog price or inventory update was made. See `FUJI_CARD_TCG_SOURCE_REVIEW.md`.
 
 Direct API calls to create orders or initialize Paystack/PayFast now fail closed unless the server-only `ORDER_PROCESSING_ENABLED=true` is set. Keep it false while stock, price, fulfillment, and payment operations are unverified. The WhatsApp order-request page remains separately disabled until a tested store number is configured.
+
+Customer-facing amounts and the currency API now show GBP only, matching the catalog and backend order currency. The inherited fixed conversion rates were removed. Add other display currencies only after an approved live rate source and rounding/payment rules are configured.
+
+The WhatsApp request and cart no longer claim free shipping or a final payable total. Shipping and the final amount are marked for store confirmation. The inherited £500 minimum is not enforced on WhatsApp requests because the owner has not confirmed it. Direct API checkout remains disabled by default and still has its old minimum/shipping logic, which must be reviewed before enabling API order processing.
