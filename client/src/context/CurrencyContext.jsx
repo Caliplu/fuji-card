@@ -1,60 +1,28 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext } from 'react';
 
 const CurrencyContext = createContext();
 
 export const useCurrency = () => useContext(CurrencyContext);
 
+// Catalog, order minimum, and API checkout amounts are denominated in GBP.
+// Do not display static exchange conversions as customer-facing prices.
 const currencyMap = {
-  USD: { symbol: '$', label: '🇺🇸 US $ USD', rate: 1.25 },
-  GBP: { symbol: '£', label: '🇬🇧 GB £ GBP', rate: 1 },
-  EUR: { symbol: '€', label: '🇪🇺 EU € EUR', rate: 1.15 },
-  JPY: { symbol: '¥', label: '🇯🇵 JP · JPY', rate: 190 },
-  AUD: { symbol: '$', label: '🇦🇺 AU $ AUD', rate: 1.90 },
-  CAD: { symbol: '$', label: '🇨🇦 CA $ CAD', rate: 1.70 },
-  NZD: { symbol: '$', label: '🇳🇿 NZ $ NZD', rate: 2.10 },
-  PLN: { symbol: 'Zł', label: '🇵🇱 PL Zł PLN', rate: 5.10 },
-  SGD: { symbol: '$', label: '🇸🇬 SG $ SGD', rate: 1.68 },
-  AED: { symbol: 'د.إ', label: '🇦🇪 AE AED', rate: 4.60 },
-  ZAR: { symbol: 'R', label: '🇿🇦 ZA R ZAR', rate: 24.50 }
+  GBP: { symbol: '£', label: '🇬🇧 GB £ GBP', rate: 1 }
 };
 
 export const CurrencyProvider = ({ children }) => {
-  const [currency, setCurrency] = useState(localStorage.getItem('currency') || 'USD');
-  const [rates, setRates] = useState({
-    GBP: 1, USD: 1.25, EUR: 1.15, JPY: 190, 
-    AUD: 1.90, CAD: 1.70, NZD: 2.10, PLN: 5.10, 
-    SGD: 1.68, AED: 4.60, ZAR: 24.50
-  });
-
-  useEffect(() => {
-    localStorage.setItem('currency', currency);
-  }, [currency]);
-
-  const convertPrice = (priceInGBP, toCurrency = currency) => {
-    const rate = rates[toCurrency] || 1;
-    const converted = priceInGBP * rate;
-    return converted.toFixed(2);
-  };
-
-  const formatPrice = (priceInGBP) => {
-    const converted = convertPrice(priceInGBP);
-    const symbol = currencyMap[currency]?.symbol || '£';
-    return `${symbol}${converted}`;
-  };
-
-  const getSymbol = () => currencyMap[currency]?.symbol || '£';
-  const getLabel = () => currencyMap[currency]?.label || 'GB £ GBP';
+  const convertPrice = (priceInGBP) => Number(priceInGBP || 0).toFixed(2);
+  const formatPrice = (priceInGBP) => `£${convertPrice(priceInGBP)}`;
 
   return (
     <CurrencyContext.Provider value={{
-      currency,
-      setCurrency,
-      currencies: Object.keys(currencyMap),
+      currency: 'GBP',
+      currencies: ['GBP'],
       currencyMap,
       convertPrice,
       formatPrice,
-      getSymbol,
-      getLabel
+      getSymbol: () => '£',
+      getLabel: () => currencyMap.GBP.label
     }}>
       {children}
     </CurrencyContext.Provider>

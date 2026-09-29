@@ -27,4 +27,4 @@ Obtain a supplier account or invoice/catalog showing the exact set code, languag
 
 ## Deployment state
 
-The connected GitHub account currently has no installed repository access in the integration, so it cannot write to `Caliplu/fuji-card`. The connected Vercel team `fuji-card` lists zero projects. This source package is prepared locally, not deployed. Upload the reviewed project to the repository with write access, import that repo into the Fuji Card Vercel team, configure the server-only Supabase secret and other required environment values, test a preview, then connect the Namecheap domain.
+The reviewed source is in draft pull request `https://github.com/Caliplu/fuji-card/pull/1`. The connected Vercel team `fuji-card` lists zero projects. Import the updated repository into that team, configure the server-only Supabase secret and other required environment values, test a preview, then connect the Namecheap domain. The source is not deployed.

@@ -6,4 +6,4 @@ Fuji Card's homepage now shows Pokémon, One Piece and Yu-Gi-Oh! collection card
 
 The archive's other external image links can be matched against specific Fuji Card SKUs later. Do not import its mock prices/stock or replace the Fuji application with the unrelated Goal26 ticketing routes.
 
-Local production build passed. These edits are in a reviewed snapshot only: there is still no accessible Vercel project under team `fuji-card`, no repository in the linked GitHub account, and no preview deployment or live DNS change.
+Local production build passed. The reviewed update is in draft pull request `https://github.com/Caliplu/fuji-card/pull/1`. There is still no Vercel project under team `fuji-card`, preview deployment, or live DNS change.

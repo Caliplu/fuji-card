@@ -14,7 +14,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { cart, refreshCart, clearCart } = useCart();
   const { isAuthenticated, user, loading: authLoading } = useAuth();
-  const { formatPrice, convertPrice, getSymbol, currency } = useCurrency();
+  const { formatPrice, convertPrice, getSymbol } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -78,12 +78,11 @@ const Checkout = () => {
       message += `   • Line Total: ${getSymbol()}${convertPrice(rawPrice * item.quantity)}\n\n`;
     });
 
-    // Totals Section
+    // Request only; the store must confirm inventory, shipping and final price.
     message += `──────────────\n`;
-    message += `💰 *ORDER TOTAL*\n`;
-    message += `• Subtotal: ${getSymbol()}${convertPrice(subtotal)}\n`;
-    message += `• Shipping: ${getSymbol()}${convertPrice(shipping)}\n`;
-    message += `• Grand Total: ${getSymbol()}${convertPrice(total)}\n`;
+    message += `💰 *ITEMS SUBTOTAL (GBP)*\n`;
+    message += `• Listed items: ${getSymbol()}${convertPrice(subtotal)}\n`;
+    message += `• Shipping and final amount: to be confirmed by Fuji Card\n`;
     message += `──────────────\n\n`;
 
     message += `Please confirm availability, shipping, and the payment method before I pay.\n`;
@@ -145,10 +144,6 @@ const Checkout = () => {
   }
 
   const subtotal = parseFloat(cart.subtotal) || 0;
-  const shipping = subtotal >= 50 ? 0 : 4.99;
-  const total = subtotal + shipping;
-  const MINIMUM_ORDER_AMOUNT = 500; // Catalog prices are in GBP.
-  const canCheckout = subtotal >= MINIMUM_ORDER_AMOUNT;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -218,43 +213,6 @@ const Checkout = () => {
     );
   }
 
-  // Check minimum order amount
-  if (!canCheckout && cart.items.length > 0) {
-    return (
-      <div className="checkout-page">
-        <div className="container">
-          <div className="minimum-order-notice">
-            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#e94560" strokeWidth="1.5">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <h2>Minimum Order Amount Required</h2>
-            <p className="minimum-message">
-              We require a minimum order value of <strong>{formatPrice(MINIMUM_ORDER_AMOUNT)}</strong> for wholesale purchases.
-            </p>
-            <div className="order-progress">
-              <div className="progress-info">
-                <span>Current Subtotal: <strong>{formatPrice(subtotal)}</strong></span>
-                <span>Required: <strong>{formatPrice(MINIMUM_ORDER_AMOUNT)}</strong></span>
-              </div>
-              <div className="progress-bar">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${Math.min((subtotal / MINIMUM_ORDER_AMOUNT) * 100, 100)}%` }}
-                />
-              </div>
-              <p className="remaining-amount">
-                Add <strong>{formatPrice(MINIMUM_ORDER_AMOUNT - subtotal)}</strong> more to checkout
-              </p>
-            </div>
-            <Link to="/products" className="btn btn-primary">Continue Shopping</Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="checkout-page">
       <div className="container">
@@ -263,7 +221,7 @@ const Checkout = () => {
         <div className="checkout-steps">
           <div className={`step ${step >= 1 ? 'active' : ''}`}>
             <span className="step-number">1</span>
-            <span className="step-label">Payment</span>
+            <span className="step-label">Request</span>
           </div>
           <div className={`step ${step >= 2 ? 'active' : ''}`}>
             <span className="step-number">2</span>
@@ -294,7 +252,7 @@ const Checkout = () => {
                   </Link>
                 </div>
 
-                <h2>Payment Information</h2>
+                <h2>Order Request</h2>
                 <p className="payment-notice">Request an order. The store will confirm availability, shipping, and payment before you pay.</p>
 
                 <div className="payment-methods-single">
@@ -407,7 +365,7 @@ const Checkout = () => {
                       className="btn btn-primary"
                       disabled={loading || !canRequestOrder}
                     >
-                      {loading ? 'Opening...' : `Request Order - ${getSymbol()}${convertPrice(total)}`}
+                      {loading ? 'Opening...' : 'Request Order'}
                     </button>
                   </div>
                   <button
@@ -461,11 +419,11 @@ const Checkout = () => {
               </div>
               <div className="summary-row">
                 <span>Shipping</span>
-                <span>{shipping === 0 ? 'FREE' : `${getSymbol()}${convertPrice(shipping)}`}</span>
+                <span>To be confirmed</span>
               </div>
               <div className="summary-row total">
-                <span>Total</span>
-                <span>{getSymbol()}{convertPrice(total)}</span>
+                <span>Items subtotal</span>
+                <span>{getSymbol()}{convertPrice(subtotal)}</span>
               </div>
             </div>
           </div>

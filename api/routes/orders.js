@@ -34,6 +34,13 @@ const getSetting = async (key, defaultValue) => {
 
 const router = express.Router();
 const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://www.fuji-card.com').replace(/\/$/, '');
+// A storefront UI toggle is not sufficient: direct API calls must fail closed too.
+const requireOrderProcessing = (req, res, next) => {
+  if (process.env.ORDER_PROCESSING_ENABLED !== 'true') {
+    return res.status(503).json({ error: 'Ordering is temporarily unavailable' });
+  }
+  next();
+};
 const validGuestSession = (req) => {
   const value = req.headers['x-session-id'];
   return typeof value === 'string' && /^guest_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)
@@ -215,7 +222,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Create order (checkout)
-router.post('/checkout', optionalAuth, async (req, res) => {
+router.post('/checkout', requireOrderProcessing, optionalAuth, async (req, res) => {
   try {
     const shippingAddress = req.body.shippingAddress || req.body.shipping_address;
     const paymentMethod = req.body.paymentMethod || req.body.payment_method;
@@ -431,7 +438,7 @@ router.post('/checkout', optionalAuth, async (req, res) => {
 });
 
 // Initialize Paystack payment (Standard Redirect)
-router.post('/paystack/initialize', optionalAuth, async (req, res) => {
+router.post('/paystack/initialize', requireOrderProcessing, optionalAuth, async (req, res) => {
   try {
     const { orderId } = req.body;
     if (!supabase) return res.status(503).json({ error: 'Payments are temporarily unavailable' });
@@ -496,7 +503,7 @@ router.post('/paystack/initialize', optionalAuth, async (req, res) => {
 });
 
 // Generate PayFast payload
-router.post('/payfast/generate', optionalAuth, async (req, res) => {
+router.post('/payfast/generate', requireOrderProcessing, optionalAuth, async (req, res) => {
   try {
     const { orderId } = req.body;
 

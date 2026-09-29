@@ -28,7 +28,7 @@ The API now requires a server-only Supabase secret key (`SUPABASE_SECRET_KEY`, w
 
 ## Required owner decisions
 
-1. Upload the reviewed updates from this archive into `Caliplu/fuji-card` using a write-capable Codex repository session or Git. Do not import the old fork contents into Vercel as the updated site.
+1. Review and merge `https://github.com/Caliplu/fuji-card/pull/1` when the preview is validated. Import the update branch for a preview first; the old `main` branch does not contain these changes yet.
 2. Create/link a Vercel project in team `fuji-card` from that repository, or show where the supplied project ID resides; the team currently lists no projects.
 3. Is the new deployment a preview of Fuji Card that will eventually replace the current `www.fuji-card.com` site? Keep the current site unchanged until that decision is confirmed.
 
