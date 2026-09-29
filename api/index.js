@@ -42,17 +42,9 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Currency rates (simplified)
+// The catalog is denominated in GBP. No unverified conversion quotes.
 app.get('/api/currencies', (req, res) => {
-  res.json({
-    rates: {
-      GBP: 1,
-      USD: 1.27,
-      EUR: 1.17,
-      JPY: 190.5
-    },
-    currencies: ['GBP', 'USD', 'EUR', 'JPY']
-  });
+  res.json({ rates: { GBP: 1 }, currencies: ['GBP'] });
 });
 
 // Health check

@@ -34,8 +34,6 @@ const Cart = () => {
   };
 
   const subtotal = parseFloat(cart.subtotal) || 0;
-  const shipping = subtotal >= 50 ? 0 : 4.99;
-  const total = subtotal + shipping;
 
   if (loading && cart.items.length === 0) {
     return (
@@ -136,16 +134,11 @@ const Cart = () => {
             </div>
             <div className="summary-row">
               <span>Shipping</span>
-              <span>{shipping === 0 ? 'FREE' : `${getSymbol()}${convertPrice(shipping)}`}</span>
+              <span>To be confirmed</span>
             </div>
-            {subtotal < 50 && (
-              <div className="free-shipping-notice">
-                Add {formatPrice(50 - subtotal)} more for free shipping!
-              </div>
-            )}
             <div className="summary-total">
-              <span>Total</span>
-              <span>{getSymbol()}{convertPrice(total)}</span>
+              <span>Items subtotal</span>
+              <span>{getSymbol()}{convertPrice(subtotal)}</span>
             </div>
             <Link to="/checkout" className="checkout-btn">
               Proceed to Checkout
