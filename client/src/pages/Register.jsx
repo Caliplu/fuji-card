@@ -48,8 +48,6 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log('Register form submitted with data:', formData);
-
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
@@ -64,9 +62,7 @@ const Register = () => {
     setError('');
 
     try {
-      console.log('Attempting registration...');
-      const result = await register(formData);
-      console.log('Registration successful, result:', result);
+      await register(formData);
       navigate(redirect);
     } catch (err) {
       const errorMessage = err.response?.data?.error || err.message || 'Registration failed';
@@ -81,7 +77,7 @@ const Register = () => {
       <div className="auth-container">
         <div className="auth-card">
           <h1>Create Account</h1>
-          <p className="auth-subtitle">Join Fuji Card Shop for exclusive offers!</p>
+          <p className="auth-subtitle">Join Fuji Card for exclusive offers!</p>
 
           {error && <div className="error-message">{error}</div>}
 

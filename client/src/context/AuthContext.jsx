@@ -9,19 +9,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const MOCK_USER = {
-    id: 'mock_user_id',
-    username: 'DemoUser',
-    firstName: '',
-    lastName: '',
-    email: '',
-    address: '',
-    city: '',
-    postcode: '',
-    country: 'United Kingdom',
-    phone: ''
-  };
-
   useEffect(() => {
     checkAuth();
   }, []);
@@ -29,16 +16,12 @@ export const AuthProvider = ({ children }) => {
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
     if (token) {
-      if (token === 'mock_token') {
-        setUser(MOCK_USER);
-        setLoading(false);
-        return;
-      }
       try {
         const response = await authAPI.getProfile();
         setUser(response.data);
       } catch (error) {
         localStorage.removeItem('token');
+        setUser(null);
       }
     }
     setLoading(false);
@@ -46,55 +29,24 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      console.log('AuthContext login attempt with email:', email);
-      try {
-        const response = await authAPI.login(email, password);
-        console.log('AuthContext login response:', response.data);
-
-        if (response.data.token && response.data.user) {
-          localStorage.setItem('token', response.data.token);
-          setUser(response.data.user);
-          
-          await mergeCartAfterLogin();
-          return response.data;
-        }
-      } catch (e) {
-        console.warn('Real login failed, triggering Resilient Mock Login for preview');
-        localStorage.setItem('token', 'mock_token');
-        setUser({ ...MOCK_USER, email });
-        return { token: 'mock_token', user: { ...MOCK_USER, email } };
-      }
+      const response = await authAPI.login(email, password);
+      if (!response.data?.token || !response.data?.user) throw new Error('Sign-in response was incomplete');
+      localStorage.setItem('token', response.data.token);
+      setUser(response.data.user);
+      await mergeCartAfterLogin();
+      return response.data;
     } catch (error) {
-      throw error;
+      throw new Error(error.response?.data?.error || error.message || 'Unable to sign in');
     }
   };
 
   const register = async (data) => {
     try {
-      console.log('Register attempt with data:', data);
-      try {
-        const response = await authAPI.register(data);
-        console.log('Register response:', response.data);
-
-        if (response.data.token && response.data.user) {
-          localStorage.setItem('token', response.data.token);
-          setUser(response.data.user);
-          return response.data;
-        }
-      } catch (e) {
-        console.warn('Real register failed, triggering Resilient Mock Session for preview');
-        // Provide a robust mock user so Checkout doesn't crash on missing fields
-        const mockSessionUser = {
-          ...MOCK_USER,
-          username: data.username || 'DemoUser',
-          email: data.email,
-          firstName: data.firstName || 'Demo',
-          lastName: data.lastName || 'Collector'
-        };
-        localStorage.setItem('token', 'mock_token');
-        setUser(mockSessionUser);
-        return { token: 'mock_token', user: mockSessionUser };
-      }
+      const response = await authAPI.register(data);
+      if (!response.data?.token || !response.data?.user) throw new Error('Registration response was incomplete');
+      localStorage.setItem('token', response.data.token);
+      setUser(response.data.user);
+      return response.data;
     } catch (error) {
       // If error is an object, ensure we throw a string for the UI
       const msg = error.response?.data?.error || error.message || 'Registration failed';
@@ -121,16 +73,12 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (data) => {
     try {
-      if (localStorage.getItem('token') === 'mock_token') {
-        setUser({ ...MOCK_USER, ...data });
-        return { user: { ...MOCK_USER, ...data } };
-      }
       const response = await authAPI.updateProfile(data);
+      if (!response.data?.user) throw new Error('Profile update response was incomplete');
       setUser(response.data.user);
       return response.data;
-    } catch (e) {
-      setUser({ ...MOCK_USER, ...data });
-      return { user: { ...MOCK_USER, ...data } };
+    } catch (error) {
+      throw new Error(error.response?.data?.error || error.message || 'Unable to update profile');
     }
   };
 

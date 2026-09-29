@@ -4,9 +4,9 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../config/supabase.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { JWT_SECRET } from '../config/auth.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'fujicard-secret-key-2024';
 
 // Register
 router.post('/register', async (req, res) => {
@@ -268,32 +268,39 @@ router.put('/profile', authenticateToken, async (req, res) => {
 router.post('/admin-login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    if (typeof username !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
 
-    // 1. Check Database for Custom Credentials (If connectivity is available)
+    // Stored credentials take precedence. A failed login must never fall through
+    // to older environment credentials.
     if (supabase) {
-      const { data: dbCreds } = await supabase
+      const { data: dbCreds, error: dbError } = await supabase
         .from('admin_settings')
         .select('value')
         .eq('key', 'admin_credentials')
         .maybeSingle();
 
+      if (dbError) return res.status(503).json({ error: 'Admin login temporarily unavailable' });
+
       if (dbCreds && dbCreds.value) {
         const { username: dbUser, passwordHash } = dbCreds.value;
-        if (username === dbUser) {
+        if (username === dbUser && passwordHash) {
           const isValid = await bcrypt.compare(password, passwordHash);
           if (isValid) {
             const token = jwt.sign({ id: 'fuji-admin', role: 'admin' }, JWT_SECRET, { expiresIn: '1d' });
             return res.json({ message: 'Admin authenticated', token });
           }
         }
+        return res.status(401).json({ error: 'Invalid admin credentials' });
       }
     }
 
-    // 2. Fallback to ENV (Default/Initial)
-    const adminUser = process.env.ADMIN_USERNAME || 'fujiadmin';
-    const adminPass = process.env.ADMIN_PASSWORD || 'fujisecret';
+    // Environment credentials are for initial setup only, and must be explicit.
+    const adminUser = process.env.ADMIN_USERNAME;
+    const adminPass = process.env.ADMIN_PASSWORD;
 
-    if (username === adminUser && password === adminPass) {
+    if (adminUser && adminPass && username === adminUser && password === adminPass) {
       const token = jwt.sign({ id: 'fuji-admin', role: 'admin' }, JWT_SECRET, { expiresIn: '1d' });
       return res.json({ message: 'Admin authenticated', token });
     }
@@ -309,28 +316,29 @@ router.post('/admin-login', async (req, res) => {
 router.post('/admin-change-password', async (req, res) => {
   try {
     const { username, oldPassword, newPassword } = req.body;
+    if (typeof username !== 'string' || typeof oldPassword !== 'string' ||
+        typeof newPassword !== 'string' || newPassword.length < 12) {
+      return res.status(400).json({ error: 'Provide current credentials and a new password of at least 12 characters' });
+    }
 
     // 1. Verify current credentials (ENV or DB)
     let authenticated = false;
     
     // Check DB first (If connectivity is available)
     if (supabase) {
-      const { data: dbCreds } = await supabase.from('admin_settings').select('value').eq('key', 'admin_credentials').maybeSingle();
+      const { data: dbCreds, error: dbError } = await supabase.from('admin_settings').select('value').eq('key', 'admin_credentials').maybeSingle();
+      if (dbError) return res.status(503).json({ error: 'Admin credentials temporarily unavailable' });
       if (dbCreds && dbCreds.value) {
-        if (username === dbCreds.value.username) {
+        if (username === dbCreds.value.username && dbCreds.value.passwordHash) {
           authenticated = await bcrypt.compare(oldPassword, dbCreds.value.passwordHash);
         }
       } else {
-        // Fallback to ENV if DB is empty but connected
-        const adminUser = process.env.ADMIN_USERNAME || 'fujiadmin';
-        const adminPass = process.env.ADMIN_PASSWORD || 'fujisecret';
-        authenticated = (username === adminUser && oldPassword === adminPass);
+        const adminUser = process.env.ADMIN_USERNAME;
+        const adminPass = process.env.ADMIN_PASSWORD;
+        authenticated = !!(adminUser && adminPass && username === adminUser && oldPassword === adminPass);
       }
     } else {
-      // Offline fallback: use ENV credentials
-      const adminUser = process.env.ADMIN_USERNAME || 'fujiadmin';
-      const adminPass = process.env.ADMIN_PASSWORD || 'fujisecret';
-      authenticated = (username === adminUser && oldPassword === adminPass);
+      return res.status(503).json({ error: 'Database offline: Cannot update credentials' });
     }
 
     if (!authenticated) {

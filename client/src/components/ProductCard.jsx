@@ -10,7 +10,7 @@ const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
   const { formatPrice } = useCurrency();
 
-  const imageUrl = product.image || product.image_url || 'https://i.ebayimg.com/images/g/YswAAOSw8~dm7fHj/s-l1600.jpg';
+  const imageUrl = product.image || product.image_url || '/logo.png';
 
   const handleAddToCart = async (e) => {
     e.preventDefault();
@@ -34,7 +34,7 @@ const ProductCard = ({ product }) => {
     }
   };
 
-  const placeholderImage = `https://via.placeholder.com/300x400?text=${encodeURIComponent(product.name)}`;
+  const placeholderImage = '/logo.png';
 
   // Handle both API formats (store.js and Supabase)
   const category = product.category || product.categories?.name || 'Unknown';
@@ -47,7 +47,7 @@ const ProductCard = ({ product }) => {
         <img 
           src={imageError ? placeholderImage : imageUrl} 
           alt={product.name}
-          onError={() => setImageError(true)}
+          onError={() => { if (!imageError) setImageError(true); }}
         />
         {/* Removed gallery controls (arrows and dots) per request */}
         {product.stock <= 3 && product.stock > 0 && (

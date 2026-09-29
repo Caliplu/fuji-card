@@ -1,6 +1,7 @@
 import express from 'express';
 import { supabase } from '../config/supabase.js';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../config/auth.js';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import { localProductStore } from '../data/flagship_products.js';
+import { products as bundledCatalog } from '../data/store.js';
 
 const router = express.Router();
 
@@ -152,7 +154,6 @@ router.get('/crypto-wallets', async (req, res) => {
         res.status(200).json({});
     }
 });
-const JWT_SECRET = process.env.JWT_SECRET || 'fujicard-secret-key-2024';
 
 // Admin authentication middleware
 const authenticateAdmin = (req, res, next) => {
@@ -201,68 +202,45 @@ router.get('/stats', async (req, res) => {
 router.get('/debug-env', (req, res) => {
     res.json({
         has_url: !!process.env.SUPABASE_URL,
-        has_key: !!process.env.SUPABASE_ANON_KEY,
-        keys: Object.keys(process.env).filter(k => k.includes('SUPABASE'))
+        has_server_key: !!(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
     });
 });
 
 // Sync local products to Supabase
 router.post('/sync-flagship', async (req, res) => {
     try {
-        console.log('[Admin] Starting flagship inventory sync...');
-
-        // 1. Fetch categories for mapping
+        if (!supabase) return res.status(503).json({ error: 'Database unavailable' });
         const { data: catData, error: catError } = await supabase.from('categories').select('id, name');
         if (catError) throw catError;
+        const catMap = new Map(catData.map(c => [c.name, c.id]));
 
-        const catMap = {};
-        catData.forEach(c => {
-            const slug = c.name.toLowerCase().replace(/[^a-z]/g, '');
-            catMap[slug] = c.id;
-        });
-
-        // Note: Avoiding delete() to prevent foreign key constraint violations on existing orders.
-        // We will utilize an intelligent upsert algorithm matching the unique 'name' index.
-
-        // 3. Prepare products
-        const productsToInsert = localProductStore.map(p => {
-            const slug = (p.category || 'other').toLowerCase().replace(/[^a-z]/g, '');
-            const categoryId = catMap[slug] || null;
-
-            // Map condition to Database ENUM values ('Mint', 'Near Mint', 'Excellent', 'Good', 'Fair', 'Poor', 'Sealed')
-            let dbCondition = 'Mint';
-            const rawCon = (p.condition || 'Mint').trim();
-
-            if (rawCon.includes('Sealed')) dbCondition = 'Sealed';
-            else if (rawCon === 'NM' || rawCon === 'Near Mint') dbCondition = 'Near Mint';
-            else if (rawCon === 'M' || rawCon === 'Mint') dbCondition = 'Mint';
-            else if (rawCon === 'Excellent' || rawCon === 'EX') dbCondition = 'Excellent';
-            else if (rawCon === 'Good') dbCondition = 'Good';
-            else if (rawCon === 'Fair') dbCondition = 'Fair';
-            else if (rawCon === 'Poor') dbCondition = 'Poor';
-
-            return {
+        // Never overwrite current stock, edited prices, images or order-linked IDs.
+        const productsToInsert = bundledCatalog.map(p => ({
+                id: p.id,
                 name: p.name,
                 description: p.description || '',
-                price: parseFloat(p.price) || 0,
+                price: p.price,
                 image_url: p.image,
-                category_id: categoryId,
-                card_type: p.cardType || 'Character',
-                set_name: p.set || 'N/A',
-                rarity: p.rarity || 'N/A',
-                condition: dbCondition,
-                language: p.language || 'Japanese',
-                stock: parseInt(p.stock) || 0,
-                featured: p.featured || false
-            };
-        });
+                category_id: catMap.get(p.category) || null,
+                card_type: p.cardType || null,
+                set_name: p.set || null,
+                rarity: p.rarity || null,
+                condition: p.condition || null,
+                language: p.language || null,
+                stock: p.stock,
+                featured: Boolean(p.featured)
+            }));
 
-        // 4. Batch Upsert to safely override duplicates without mutating historical IDs
-        const { error: insertError } = await supabase.from('products').upsert(productsToInsert, { onConflict: 'name' });
-        if (insertError) throw insertError;
+        for (let offset = 0; offset < productsToInsert.length; offset += 100) {
+            const { error } = await supabase.from('products')
+                .upsert(productsToInsert.slice(offset, offset + 100), {
+                    onConflict: 'id', ignoreDuplicates: true
+                });
+            if (error) throw error;
+        }
 
         res.json({
-            message: 'Flagship inventory synchronized successfully!',
+            message: 'Bundled catalog checked. Existing products and stock were not changed.',
             count: productsToInsert.length
         });
     } catch (error) {

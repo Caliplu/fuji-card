@@ -62,7 +62,7 @@ const Account = () => {
   const fetchOrders = async () => {
     try {
       const response = await ordersAPI.getAll();
-      setOrders(response.data.orders || []);
+      setOrders(Array.isArray(response.data) ? response.data : (response.data?.orders || []));
     } catch (error) {
       console.error('Failed to fetch orders:', error);
     }
@@ -72,7 +72,7 @@ const Account = () => {
     try {
       // Fetch from orders API - these are the transactions
       const response = await ordersAPI.getAll();
-      setTransactions(response.data.orders || []);
+      setTransactions(Array.isArray(response.data) ? response.data : (response.data?.orders || []));
     } catch (error) {
       console.error('Failed to fetch transactions:', error);
     }
@@ -182,7 +182,7 @@ const Account = () => {
                 className={activeTab === 'transactions' ? 'active' : ''}
                 onClick={() => setActiveTab('transactions')}
               >
-                Transaction History
+                Order History
               </button>
               <button
                 className={activeTab === 'profile' ? 'active' : ''}
@@ -211,9 +211,9 @@ const Account = () => {
                       <div key={order.id} className="order-card">
                         <div className="order-header">
                           <div className="order-info">
-                            <span className="order-number">{order.orderNumber}</span>
+                            <span className="order-number">{order.order_number || order.orderNumber}</span>
                             <span className="order-date">
-                              {new Date(order.createdAt).toLocaleDateString()}
+                              {new Date(order.created_at || order.createdAt).toLocaleDateString()}
                             </span>
                           </div>
                           <span
@@ -227,11 +227,9 @@ const Account = () => {
                           {(order.items || []).slice(0, 3).map((item, index) => (
                             <div key={index} className="order-item">
                               <img
-                                src={item.image || item.image_url}
+                                src={item.image || item.image_url || '/logo.png'}
                                 alt={item.name}
-                                onError={(e) => {
-                                  e.target.src = 'https://via.placeholder.com/50x65?text=Card';
-                                }}
+                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.png'; }}
                               />
                               <div className="order-item-info">
                                 <span className="item-name">{item.name}</span>
@@ -258,14 +256,14 @@ const Account = () => {
             {activeTab === 'transactions' && (
               <div className="transactions-section">
                 <div className="section-header">
-                  <h2>Transaction History</h2>
+                  <h2>Order History</h2>
                   <div className="transaction-stats">
                     <div className="stat-card">
-                      <span className="stat-label">Total Transactions</span>
+                      <span className="stat-label">Orders</span>
                       <span className="stat-value">{transactions.length}</span>
                     </div>
                     <div className="stat-card">
-                      <span className="stat-label">Total Spent</span>
+                      <span className="stat-label">Order value</span>
                       <span className="stat-value">{formatPrice(getTotalTransactionValue())}</span>
                     </div>
                   </div>
@@ -278,7 +276,7 @@ const Account = () => {
                       <path d="M7 15h.01" />
                       <path d="M11 15h2" />
                     </svg>
-                    <p>No transactions yet</p>
+                    <p>No orders yet</p>
                     <Link to="/products" className="btn btn-primary">Make Your First Purchase</Link>
                   </div>
                 ) : (
@@ -301,16 +299,14 @@ const Account = () => {
                         </div>
 
                         <div className="transaction-items">
-                          <h4>Items Purchased</h4>
+                          <h4>Order items</h4>
                           <div className="items-grid">
                             {transaction.items?.slice(0, 3).map((item, index) => (
                               <div key={index} className="mini-item">
                                 <img
-                                  src={item.image || item.image_url}
+                                  src={item.image || item.image_url || '/logo.png'}
                                   alt={item.name}
-                                  onError={(e) => {
-                                    e.target.src = 'https://via.placeholder.com/40x40?text=Card';
-                                  }}
+                                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.png'; }}
                                 />
                                 <div className="mini-item-info">
                                   <span className="mini-item-name">{item.name}</span>
@@ -333,20 +329,7 @@ const Account = () => {
                             <div className="detail-row">
                               <span className="label">Payment Method:</span>
                               <span className="value payment-method">
-                                {transaction.payment_method === 'cryptomus' ? (
-                                  <span className="crypto-badge">
-                                    <span className="crypto-icon">₿</span>
-                                    Cryptomus
-                                  </span>
-                                ) : (
-                                  <span className="card-badge">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                                      <line x1="1" y1="10" x2="23" y2="10"></line>
-                                    </svg>
-                                    Card Payment
-                                  </span>
-                                )}
+                                {({ paystack: 'Paystack', payfast: 'PayFast', cryptomus: 'Crypto', request: 'Order request', card: 'Card' })[transaction.payment_method] || transaction.payment_method || 'To be confirmed'}
                               </span>
                             </div>
                             <div className="detail-row">

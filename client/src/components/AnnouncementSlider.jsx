@@ -137,9 +137,7 @@ const AnnouncementSlider = () => {
                       src={announcement.image} 
                       alt={announcement.title}
                       className="showcase-card"
-                      onError={(e) => {
-                        e.target.src = `https://via.placeholder.com/300x400?text=${encodeURIComponent(announcement.title)}`;
-                      }}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.png'; }}
                     />
                     <div className="card-glow"></div>
                     <div className="floating-particles">

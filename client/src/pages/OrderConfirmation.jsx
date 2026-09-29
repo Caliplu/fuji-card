@@ -22,13 +22,13 @@ const OrderConfirmation = () => {
             </svg>
           </div>
 
-          <h1>Order Confirmed!</h1>
-          <p className="thank-you">Thank you for your order. We've received your payment and will process your order shortly.</p>
+          <h1>Order received</h1>
+          <p className="thank-you">Your order has been recorded. Payment is not confirmed until we verify it.</p>
 
           <div className="order-details">
             <div className="detail-row">
               <span>Order Number</span>
-              <span className="order-number">{order.orderNumber}</span>
+              <span className="order-number">{order.order_number || order.orderNumber || order.id}</span>
             </div>
             <div className="detail-row">
               <span>Order Total</span>
@@ -40,9 +40,7 @@ const OrderConfirmation = () => {
             </div>
           </div>
 
-          <p className="email-notice">
-            A confirmation email has been sent to your email address with the order details.
-          </p>
+          <p className="email-notice">Check your order status in your account or contact support if you need help.</p>
 
           <div className="confirmation-actions">
             <Link to="/account" className="btn btn-outline">View My Orders</Link>

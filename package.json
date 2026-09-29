@@ -1,7 +1,7 @@
 {
   "name": "fujicard-monorepo",
   "version": "1.0.0",
-  "description": "Fuji Card Market Monorepo for Vercel",
+  "description": "Fuji Card Monorepo for Vercel",
   "private": true,
   "type": "module",
   "scripts": {

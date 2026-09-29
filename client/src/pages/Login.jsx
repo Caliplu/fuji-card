@@ -23,19 +23,13 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    console.log('Login form submitted with data:', { email: formData.email, password: '***' });
-    
     setLoading(true);
     setError('');
 
     try {
-      console.log('Attempting login...');
-      const result = await login(formData.email, formData.password);
-      console.log('Login successful, result:', result);
+      await login(formData.email, formData.password);
       navigate(redirect);
     } catch (err) {
-      console.error('Login error in Login component:', err);
-      console.error('Error response:', err.response?.data);
       const errorMessage = err.response?.data?.error || err.message || 'Login failed';
       setError(errorMessage);
     } finally {
