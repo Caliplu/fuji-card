@@ -2,7 +2,7 @@
 
 **Known public website:** https://www.fuji-card.com. The owner now controls the domain and has an owner-controlled source fork. The current live hosting remains unverified.
 
-**Owner account inventory (no passwords):** the owner's connected account is the login email the owner supplied for the connected GitHub and Vercel accounts. GitHub fork: `https://github.com/Caliplu/fuji-card` (the reviewed ZIP updates are not uploaded). Vercel team: `https://vercel.com/fuji-card` (no projects visible to the connected account). New Supabase project: `https://supabase.com/dashboard/project/zzazhmsdxlwdndzvrnwn`, API URL `https://zzazhmsdxlwdndzvrnwn.supabase.co` (schema and catalog initialized). These are account and project references, not storefront customer login credentials. The inactive `fujicard@fuji-card.com` address must not be presented as working support.
+**Owner account inventory (no passwords):** the owner's connected account is the login email the owner supplied for the connected GitHub and Vercel accounts. GitHub fork: `https://github.com/Caliplu/fuji-card` (reviewed update in draft pull request #1). Vercel team: `https://vercel.com/fuji-card` (no projects visible to the connected account). New Supabase project: `https://supabase.com/dashboard/project/zzazhmsdxlwdndzvrnwn`, API URL `https://zzazhmsdxlwdndzvrnwn.supabase.co` (schema and catalog initialized). These are account and project references, not storefront customer login credentials. The inactive `fujicard@fuji-card.com` address must not be presented as working support.
 
 **Namecheap update:** A Namecheap email screenshot dated 29 September 2026 states the recipient is now owner of `fuji-card.com`. Confirm in the Namecheap account whether a hosting subscription also appears, and what nameservers/DNS records point to the live site. The domain ownership notice does not identify the web server or transfer the code and database.
 
@@ -13,7 +13,7 @@ Use this as a checklist. Fill in links, account names, and whether an invitation
 | Item | What to provide | Status / link (no secrets) |
 | --- | --- | --- |
 | Live storefront | Public production URL | https://www.fuji-card.com |
-| Source repository | GitHub repository URL and collaborator access with permission to create branches and pull requests | Owner fork `https://github.com/Caliplu/fuji-card`; GitHub plugin write attempt returned 403, so reviewed changes remain in the ZIP |
+| Source repository | GitHub repository URL and collaborator access with permission to create branches and pull requests | Owner fork `https://github.com/Caliplu/fuji-card`; draft pull request `https://github.com/Caliplu/fuji-card/pull/1` contains the reviewed changes |
 | Project owner | Name or business that owns the repo, domain, hosting, and database | |
 | Release process | Who reviews and approves a production deployment | |
 | Priorities | The first three changes you want, and any launch deadline | |
