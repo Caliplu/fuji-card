@@ -40,11 +40,11 @@ const AdminDashboard = () => {
     const [showNotifications, setShowNotifications] = useState(false);
     // Crypto wallet config editor state
     const [cryptoWallets, setCryptoWallets] = useState({
-        BTC: { label: 'Bitcoin', address: 'bc1qhupxlhjaddepp62pdrlj682yhlt203qzu5spap', trustLink: 'https://link.trustwallet.com/send?address=bc1qhupxlhjaddepp62pdrlj682yhlt203qzu5spap&asset=c0', qrFile: 'btc-qr.png', color: '#f7931a' },
-        ETH: { label: 'Ethereum', address: '0x8101625364B48146ea92E1FEeB48fd90c852a215', trustLink: 'https://link.trustwallet.com/send?address=0x8101625364B48146ea92E1FEeB48fd90c852a215&asset=c60', qrFile: 'eth-qr.png', color: '#627eea' },
-        USDT: { label: 'Tether (USDT)', address: '0x8101625364B48146ea92E1FEeB48fd90c852a215', trustLink: 'https://link.trustwallet.com/send?asset=c60_t0xdAC17F958D2ee523a2206206994597C13D831ec7&address=0x8101625364B48146ea92E1FEeB48fd90c852a215', qrFile: 'usdt-qr.png', color: '#26a17b' },
-        USDC: { label: 'USD Coin (USDC)', address: '0x8101625364B48146ea92E1FEeB48fd90c852a215', trustLink: 'https://link.trustwallet.com/send?address=0x8101625364B48146ea92E1FEeB48fd90c852a215&asset=c60_t0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', qrFile: 'usdc-qr.png', color: '#2775ca' },
-        LTC: { label: 'Litecoin', address: 'ltc1qhncs35rmy3kdcnj62vxnswa9ajgnk8f6yksn66', trustLink: 'https://link.trustwallet.com/send?asset=c2&address=ltc1qhncs35rmy3kdcnj62vxnswa9ajgnk8f6yksn66', qrFile: 'ltc-qr.png', color: '#bfbbbb' }
+        BTC: { label: 'Bitcoin', address: '', trustLink: '', qrFile: '', color: '#f7931a' },
+        ETH: { label: 'Ethereum', address: '', trustLink: '', qrFile: '', color: '#627eea' },
+        USDT: { label: 'Tether (USDT)', address: '', trustLink: '', qrFile: '', color: '#26a17b' },
+        USDC: { label: 'USD Coin (USDC)', address: '', trustLink: '', qrFile: '', color: '#2775ca' },
+        LTC: { label: 'Litecoin', address: '', trustLink: '', qrFile: '', color: '#bfbbbb' }
     });
     const [paystackConfig, setPaystackConfig] = useState({ publicKey: '', secretKey: '' });
     const [payfastConfig, setPayfastConfig] = useState({ merchantId: '', merchantKey: '', passphrase: '', url: 'https://www.payfast.co.za/eng/process' });
@@ -1442,7 +1442,7 @@ const AdminDashboard = () => {
                                 <span style={{ fontSize: '1.3rem' }}>₿</span> Crypto Wallet Manager
                             </h2>
                             <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '1.5rem', marginTop: '-0.75rem' }}>
-                                Update wallet addresses, Trust Wallet links, and QR code images shown to customers during checkout.
+                                Wallet settings are not used by the current order-request checkout. Verify ownership before enabling any crypto payment flow.
                             </p>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>

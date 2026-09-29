@@ -10,11 +10,21 @@ const memoryCarts = {};
 
 // Helper to get cart key (user id or session id)
 const getCartKey = (req) => {
-  return req.user ? req.user.id : req.headers['x-session-id'] || 'guest';
+  if (req.user) return req.user.id;
+  const sessionId = req.headers['x-session-id'];
+  return typeof sessionId === 'string' && /^guest_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(sessionId)
+    ? sessionId : null;
 };
 
+const requireCartKey = (req, res, next) => {
+  if (!getCartKey(req)) return res.status(400).json({ error: 'A valid cart session is required' });
+  next();
+};
+
+router.use(optionalAuth, requireCartKey);
+
 // Get cart
-router.get('/', optionalAuth, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const cartKey = getCartKey(req);
 
@@ -111,13 +121,16 @@ router.get('/', optionalAuth, async (req, res) => {
 });
 
 // Add to cart
-router.post('/add', optionalAuth, async (req, res) => {
+router.post('/add', async (req, res) => {
   try {
     const { productId, quantity = 1 } = req.body;
     const cartKey = getCartKey(req);
 
     if (!productId) {
       return res.status(400).json({ error: 'Product ID required' });
+    }
+    if (!Number.isSafeInteger(quantity) || quantity < 1) {
+      return res.status(400).json({ error: 'Quantity must be a positive integer' });
     }
 
     // FALLBACK IF NO SUPABASE
@@ -200,11 +213,14 @@ router.post('/add', optionalAuth, async (req, res) => {
 });
 
 // Update cart item quantity
-router.put('/update/:itemId', optionalAuth, async (req, res) => {
+router.put('/update/:itemId', async (req, res) => {
   try {
     const { quantity } = req.body;
     const { itemId } = req.params;
     const cartKey = getCartKey(req);
+    if (!Number.isSafeInteger(quantity) || quantity < 0) {
+      return res.status(400).json({ error: 'Quantity must be a non-negative integer' });
+    }
 
     if (!supabase) {
       if (!memoryCarts[cartKey]) return res.status(404).json({ error: 'Cart empty' });
@@ -219,19 +235,34 @@ router.put('/update/:itemId', optionalAuth, async (req, res) => {
       return res.json({ message: 'Memory cart updated' });
     }
 
+    // A cart item ID alone is not proof of ownership. Scope every mutation
+    // through the cart belonging to this authenticated user or guest session.
+    const { data: cart, error: cartError } = await supabase.from('carts')
+      .select('id').eq('session_id', cartKey).maybeSingle();
+    if (cartError) throw cartError;
+    if (!cart) return res.status(404).json({ error: 'Item not found' });
+
     // Get cart item
     const { data: item } = await supabase
       .from('cart_items')
       .select(`*, products (stock)`)
       .eq('id', itemId)
+      .eq('cart_id', cart.id)
       .single();
 
     if (!item) return res.status(404).json({ error: 'Item not found' });
 
     if (quantity <= 0) {
-      await supabase.from('cart_items').delete().eq('id', itemId);
+      const { error } = await supabase.from('cart_items').delete().eq('id', itemId).eq('cart_id', cart.id);
+      if (error) throw error;
     } else {
-      await supabase.from('cart_items').update({ quantity, updated_at: new Date().toISOString() }).eq('id', itemId);
+      if (!item.products || quantity > Number(item.products.stock)) {
+        return res.status(409).json({ error: 'Not enough stock available' });
+      }
+      const { error } = await supabase.from('cart_items')
+        .update({ quantity, updated_at: new Date().toISOString() })
+        .eq('id', itemId).eq('cart_id', cart.id);
+      if (error) throw error;
     }
     res.json({ message: 'Cart updated' });
   } catch (error) {
@@ -240,7 +271,7 @@ router.put('/update/:itemId', optionalAuth, async (req, res) => {
 });
 
 // Remove from cart
-router.delete('/remove/:itemId', optionalAuth, async (req, res) => {
+router.delete('/remove/:itemId', async (req, res) => {
   try {
     const { itemId } = req.params;
     const cartKey = getCartKey(req);
@@ -252,7 +283,14 @@ router.delete('/remove/:itemId', optionalAuth, async (req, res) => {
       return res.json({ message: 'Removed from memory cart' });
     }
 
-    await supabase.from('cart_items').delete().eq('id', itemId);
+    const { data: cart, error: cartError } = await supabase.from('carts')
+      .select('id').eq('session_id', cartKey).maybeSingle();
+    if (cartError) throw cartError;
+    if (!cart) return res.status(404).json({ error: 'Item not found' });
+    const { data: removed, error } = await supabase.from('cart_items')
+      .delete().eq('id', itemId).eq('cart_id', cart.id).select('id').maybeSingle();
+    if (error) throw error;
+    if (!removed) return res.status(404).json({ error: 'Item not found' });
     res.json({ message: 'Item removed' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -260,7 +298,7 @@ router.delete('/remove/:itemId', optionalAuth, async (req, res) => {
 });
 
 // Clear cart
-router.delete('/clear', optionalAuth, async (req, res) => {
+router.delete('/clear', async (req, res) => {
   try {
     const cartKey = getCartKey(req);
     if (!supabase) {

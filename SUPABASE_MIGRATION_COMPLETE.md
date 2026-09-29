@@ -112,7 +112,7 @@ All API endpoints have been tested and verified:
 ```
 SUPABASE_URL=https://xfnemjjovywyzqeemjmk.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-JWT_SECRET=fujicard-secret-key-2024-change-in-production
+JWT_SECRET=<generate-a-unique-random-secret-of-at-least-32-characters>
 PORT=5000
 ```
 

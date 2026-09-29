@@ -1,284 +1,95 @@
 import express from 'express';
 import { supabase } from '../config/supabase.js';
-import { products as fallbackProducts } from '../data/store.js';
 
 const router = express.Router();
-
-// Get all products with filtering
-router.get('/', async (req, res) => {
-  // Prevent Vercel/Browser caching of stale product data
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  try {
-    const {
-      category,
-      search,
-      minPrice,
-      maxPrice,
-      rarity,
-      condition,
-      language,
-      set,
-      sort,
-      featured,
-      limit,
-      page = 1
-    } = req.query;
-
-    console.log('📦 Products API called with params:', { category, search, limit, page, featured });
-
-    // ALWAYS USE FALLBACK DATA FROM STORE.JS TO ENSURE EXACTLY 600 ITEMS ARE SHOWN
-    if (true || !supabase) {
-      console.log('⚠️  Using fallback products data (Supabase not configured or available)');
-      let result = [...fallbackProducts];
-      
-      // Filter featured
-      if (featured === 'true') {
-        result = result.filter(p => p.featured);
-      }
-      
-      // Category filter
-      if (category) {
-        result = result.filter(p => p.category?.toLowerCase() === category.toLowerCase());
-      }
-
-      // Search
-      if (search) {
-        const s = search.toLowerCase();
-        result = result.filter(p => p.name.toLowerCase().includes(s) || p.description?.toLowerCase().includes(s));
-      }
-
-      // Sorting
-      if (sort === 'price_asc') {
-        result.sort((a, b) => a.price - b.price);
-      } else if (sort === 'price_desc') {
-        result.sort((a, b) => b.price - a.price);
-      } else {
-        // Default: newest IDs first (rough proxy for created_at)
-        result.reverse(); 
-      }
-
-      const pageSize = limit ? parseInt(limit) : 24;
-      const currentPage = parseInt(page);
-      const totalProducts = result.length;
-      const totalPages = Math.ceil(totalProducts / pageSize);
-      const startIndex = (currentPage - 1) * pageSize;
-      const paginated = result.slice(startIndex, startIndex + pageSize);
-
-      return res.json({
-        products: paginated,
-        pagination: {
-          currentPage,
-          totalPages,
-          totalProducts,
-          hasMore: currentPage < totalPages
-        }
-      });
-    }
-
-    // Build query - start with products and join categories
-    let query = supabase
-      .from('products')
-      .select(`
-        *,
-        categories(
-          id,
-          name
-        )
-      `, { count: 'estimated' });
-
-    // Filter by category (case-insensitive)
-    if (category) {
-      query = query.ilike('categories.name', category);
-    }
-
-    // Search by name or description
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
-    }
-
-    // Filter by price range
-    if (minPrice) {
-      query = query.gte('price', parseFloat(minPrice));
-    }
-    if (maxPrice) {
-      query = query.lte('price', parseFloat(maxPrice));
-    }
-
-    // Filter by rarity
-    if (rarity) {
-      query = query.eq('rarity', rarity);
-    }
-
-    // Filter by condition
-    if (condition) {
-      query = query.eq('condition', condition);
-    }
-
-    // Filter by language
-    if (language) {
-      query = query.eq('language', language);
-    }
-
-    // Filter by set
-    if (set) {
-      query = query.eq('set_name', set);
-    }
-
-    // Filter featured
-    if (featured === 'true') {
-      query = query.eq('featured', true);
-    }
-
-    // Sorting
-    if (sort) {
-      switch (sort) {
-        case 'price_asc':
-          query = query.order('price', { ascending: true });
-          break;
-        case 'price_desc':
-          query = query.order('price', { ascending: false });
-          break;
-        case 'name_asc':
-          query = query.order('name', { ascending: true });
-          break;
-        case 'name_desc':
-          query = query.order('name', { ascending: false });
-          break;
-        case 'newest':
-          query = query.order('created_at', { ascending: false });
-          break;
-        default:
-          query = query.order('created_at', { ascending: false });
-      }
-    } else {
-      query = query.order('created_at', { ascending: false });
-    }
-
-    // Pagination
-    const pageSize = limit ? parseInt(limit) : 12;
-    const currentPage = parseInt(page);
-    const startIndex = (currentPage - 1) * pageSize;
-
-    query = query.range(startIndex, startIndex + pageSize - 1);
-
-    const { data: products, error, count } = await query;
-
-    if (error) {
-      console.error('Supabase error:', error);
-      return res.status(500).json({ error: 'Supabase database query failed' });
-    }
-
-    const totalPages = Math.ceil(count / pageSize);
-
-    res.json({
-      products,
-      pagination: {
-        currentPage,
-        totalPages,
-        totalProducts: count,
-        hasMore: currentPage < totalPages
-      }
-    });
-  } catch (error) {
-    console.error('Server error:', error);
-    return res.status(500).json({ error: 'Server parameters parsing exception' });
-  }
+const toStoreProduct = (product) => ({
+  ...product,
+  category: product.categories?.name || 'other',
+  image: product.image_url,
+  set: product.set_name,
+  cardType: product.card_type,
+  originalPrice: product.original_price
 });
 
-// Get single product
-router.get('/:id', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  try {
-    if (true || !supabase) {
-      const product = fallbackProducts.find(p => p.id === req.params.id);
-      if (!product) return res.status(404).json({ error: 'Product not found' });
-      
-      const related = fallbackProducts
-        .filter(p => p.category === product.category && p.id !== product.id)
-        .slice(0, 4);
-        
-      return res.json({ product, related });
-    }
-
-    const { data: product, error } = await supabase
-      .from('products')
-      .select(`
-        *,
-        categories (
-          id,
-          name,
-          description,
-          image_url
-        )
-      `)
-      .eq('id', req.params.id)
-      .single();
-
-    if (error || !product) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    // Get related products (same category, different product)
-    const { data: related } = await supabase
-      .from('products')
-      .select('*')
-      .eq('category_id', product.category_id)
-      .neq('id', req.params.id)
-      .limit(4);
-
-    res.json({ product, related: related || [] });
-  } catch (error) {
-    console.error('Server error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+router.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!supabase) return res.status(503).json({ error: 'Product catalog temporarily unavailable' });
+  next();
 });
 
-// Get filter options
+// This route must precede /:id.
 router.get('/filters/options', async (req, res) => {
   try {
-    const { category } = req.query;
-
-    if (true || !supabase) {
-      console.log('⚠️  Using fallback filter options (Supabase not configured)');
-      let data = [...fallbackProducts];
-      
-      if (category) {
-        data = data.filter(p => p.category?.toLowerCase() === category.toLowerCase());
-      }
-
-      const rarities = [...new Set(data.map(p => p.rarity).filter(r => r && r !== 'N/A'))];
-      const conditions = [...new Set(data.map(p => p.condition))];
-      const languages = [...new Set(data.map(p => p.language).filter(l => l && l !== 'N/A'))];
-      const sets = [...new Set(data.map(p => p.set_name || p.set).filter(s => s && s !== 'N/A'))];
-
-      return res.json({ rarities, conditions, languages, sets });
-    }
-
-    let query = supabase.from('products').select(`
-      rarity, 
-      condition, 
-      language, 
-      set_name,
-      categories!inner(
-        name
-      )
-    `);
-
-    if (category) {
-      query = query.eq('categories.name', category);
-    }
-
-    const { data } = await query;
-
-    const rarities = [...new Set(data.map(p => p.rarity).filter(r => r && r !== 'N/A'))];
-    const conditions = [...new Set(data.map(p => p.condition))];
-    const languages = [...new Set(data.map(p => p.language).filter(l => l && l !== 'N/A'))];
-    const sets = [...new Set(data.map(p => p.set_name).filter(s => s && s !== 'N/A'))];
-
-    res.json({ rarities, conditions, languages, sets });
+    let query = supabase.from('products')
+      .select('rarity, condition, language, set_name, categories!inner(name)');
+    if (req.query.category) query = query.eq('categories.name', req.query.category);
+    const { data, error } = await query;
+    if (error) throw error;
+    const values = (key) => [...new Set(data.map(p => p[key]).filter(Boolean))];
+    res.json({ rarities: values('rarity'), conditions: values('condition'),
+      languages: values('language'), sets: values('set_name') });
   } catch (error) {
-    console.error('Server error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Product filters error:', error);
+    res.status(503).json({ error: 'Product filters temporarily unavailable' });
+  }
+});
+
+router.get('/', async (req, res) => {
+  try {
+    const { category, search, minPrice, maxPrice, rarity, condition,
+      language, set, sort, featured } = req.query;
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(1000, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
+    let query = supabase.from('products')
+      .select('*, categories!inner(id, name)', { count: 'exact' });
+
+    if (category) query = query.eq('categories.name', category);
+    if (search) query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+    if (minPrice && Number.isFinite(Number(minPrice))) query = query.gte('price', Number(minPrice));
+    if (maxPrice && Number.isFinite(Number(maxPrice))) query = query.lte('price', Number(maxPrice));
+    if (rarity) query = query.eq('rarity', rarity);
+    if (condition) query = query.eq('condition', condition);
+    if (language) query = query.eq('language', language);
+    if (set) query = query.eq('set_name', set);
+    if (featured === 'true') query = query.eq('featured', true);
+
+    const sortColumns = {
+      price_asc: ['price', true], price_desc: ['price', false],
+      name_asc: ['name', true], name_desc: ['name', false]
+    };
+    const [column, ascending] = sortColumns[sort] || ['created_at', false];
+    query = query.order(column, { ascending })
+      .range((page - 1) * limit, page * limit - 1);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+    const totalProducts = count || 0;
+    const totalPages = Math.ceil(totalProducts / limit);
+    res.json({ products: data.map(toStoreProduct), pagination: {
+      currentPage: page, totalPages, totalProducts, hasMore: page < totalPages
+    } });
+  } catch (error) {
+    console.error('Products error:', error);
+    res.status(503).json({ error: 'Product catalog temporarily unavailable' });
+  }
+});
+
+router.get('/:id', async (req, res) => {
+  try {
+    const { data: product, error } = await supabase.from('products')
+      .select('*, categories(id, name, description, image_url)')
+      .eq('id', req.params.id).maybeSingle();
+    if (error) throw error;
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const { data: related, error: relatedError } = await supabase.from('products')
+      .select('*, categories(id, name)').eq('category_id', product.category_id)
+      .neq('id', product.id).limit(4);
+    if (relatedError) throw relatedError;
+    res.json({ product: toStoreProduct(product), related: related.map(toStoreProduct) });
+  } catch (error) {
+    console.error('Product detail error:', error);
+    res.status(503).json({ error: 'Product temporarily unavailable' });
   }
 });
 

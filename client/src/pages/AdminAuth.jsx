@@ -83,7 +83,7 @@ const AdminAuth = () => {
       <div className="admin-auth-card glass-panel">
         <div className="admin-auth-header">
           <h1 className="admin-title">Classified Access</h1>
-          <p className="admin-subtitle">Fuji Card Market System</p>
+          <p className="admin-subtitle">Fuji Card Admin</p>
         </div>
 
         {error && <div className="admin-alert error">{error}</div>}

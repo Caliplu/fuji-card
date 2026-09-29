@@ -6,6 +6,7 @@ import axios from 'axios';
 import './Header.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
+const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || '';
 
 const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,14 +97,11 @@ const Header = () => {
               <i className="fa-solid fa-envelope"></i>
               CONTACT
             </Link>
-            <div className="social-nodes">
-              <a href="https://facebook.com" target="_blank" rel="noreferrer" className="node">
-                <i className="fa-brands fa-facebook-f"></i>
-              </a>
-              <a href="https://www.instagram.com/fuji_cards?igsh=MXZybHY2anNwenJrZw%3D%3D&utm_source=qr" target="_blank" rel="noreferrer" className="node">
+            {instagramUrl && <div className="social-nodes">
+              <a href={instagramUrl} target="_blank" rel="noreferrer" className="node" aria-label="Instagram">
                 <i className="fa-brands fa-instagram"></i>
               </a>
-            </div>
+            </div>}
           </div>
         </div>
       </div>
@@ -116,8 +114,8 @@ const Header = () => {
           </button>
 
           <Link to="/" className="branding-mockup">
-            <img src="/logo.png" alt="Fuji Card Shop" className="logo-mockup-round" />
-            <span className="name-mockup-bold">FUJI CARD SHOP</span>
+            <img src="/logo.png" alt="Fuji Card" className="logo-mockup-round" />
+            <span className="name-mockup-bold">FUJI CARD</span>
           </Link>
 
           {/* Desktop Search Bar */}

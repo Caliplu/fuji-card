@@ -33,6 +33,12 @@ const getSetting = async (key, defaultValue) => {
 // --- END SETTINGS MIGRATION ---
 
 const router = express.Router();
+const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://www.fuji-card.com').replace(/\/$/, '');
+const validGuestSession = (req) => {
+  const value = req.headers['x-session-id'];
+  return typeof value === 'string' && /^guest_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)
+    ? value : null;
+};
 
 /**
  * Generate PayFast MD5 signature.
@@ -91,9 +97,7 @@ const generatePayfastSignature = (data, passPhrase = null) => {
      finalString += `&passphrase=${String(passPhrase).trim()}`;
   }
 
-  console.log('[PayFast MD5 Debug] String for hashing:', finalString);
   const signature = crypto.createHash('md5').update(finalString).digest('hex');
-  console.log('[PayFast MD5 Debug] Generated Signature:', signature);
   return signature;
 };
 
@@ -121,7 +125,10 @@ router.get('/', authenticateToken, async (req, res) => {
         order_items (
           id,
           product_id,
-          quantity
+          quantity,
+          name,
+          price,
+          image_url
         )
       `)
       .eq('user_id', req.user.id)
@@ -136,9 +143,9 @@ router.get('/', authenticateToken, async (req, res) => {
         id: item.id,
         productId: item.product_id,
         quantity: item.quantity,
-        price: 0, // Default price since column doesn't exist
-        name: 'Product', // Default name since column doesn't exist
-        image: '' // Default image since column doesn't exist
+        price: item.price,
+        name: item.name,
+        image: item.image_url || ''
       }))
     }));
 
@@ -173,7 +180,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
         order_items (
           id,
           product_id,
-          quantity
+          quantity,
+          name,
+          price,
+          image_url
         )
       `)
       .eq('id', req.params.id)
@@ -191,9 +201,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
         id: item.id,
         productId: item.product_id,
         quantity: item.quantity,
-        price: 0, // Default price since column doesn't exist
-        name: 'Product', // Default name since column doesn't exist
-        image: '' // Default image since column doesn't exist
+        price: item.price,
+        name: item.name,
+        image: item.image_url || ''
       }))
     };
 
@@ -206,28 +216,17 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
 // Create order (checkout)
 router.post('/checkout', optionalAuth, async (req, res) => {
-  console.log('[Checkout] Req Body:', JSON.stringify(req.body, null, 2));
   try {
     const shippingAddress = req.body.shippingAddress || req.body.shipping_address;
     const paymentMethod = req.body.paymentMethod || req.body.payment_method;
-    const { items: manualItems, currency = 'GBP', total: manualTotal } = req.body;
-    const cartKey = req.user ? req.user.id : req.headers['x-session-id'] || 'guest';
+    const { items: manualItems } = req.body;
+    const currency = 'GBP'; // Catalog prices and shipping thresholds are in GBP.
+    const cartKey = req.user ? req.user.id : validGuestSession(req);
 
-    // --- FALLBACK IF SUPABASE IS NOT CONFIGURED ---
+    if (!cartKey) return res.status(400).json({ error: 'A valid checkout session is required' });
+
     if (!supabase) {
-      console.log('⚠️  Using mockup checkout (Supabase not configured)');
-      const orderId = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-      const mockOrder = {
-        id: orderId,
-        order_number: `ORD-${orderId}`,
-        status: 'pending',
-        payment_method: paymentMethod || 'card',
-        currency: currency,
-        subtotal: parseFloat(req.body.subtotal || 0).toFixed(2),
-        total: parseFloat(manualTotal || 0).toFixed(2),
-        created_at: new Date().toISOString()
-      };
-      return res.json({ order: mockOrder });
+      return res.status(503).json({ error: 'Checkout is temporarily unavailable' });
     }
 
     // Get cart
@@ -265,13 +264,14 @@ router.post('/checkout', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
+    const invalidQuantity = (quantity) => !Number.isSafeInteger(quantity) || quantity < 1;
+
     if (hasDBCart) {
       for (const cartItem of cart.cart_items) {
         const product = cartItem.products;
 
-        if (!product) {
-          console.warn(`[Checkout] Missing product data for cart item. Skipping item.`);
-          continue;
+        if (!product || invalidQuantity(cartItem.quantity)) {
+          return res.status(400).json({ error: 'Cart contains an invalid item' });
         }
 
         // Fetch fresh stock data to avoid cache issues
@@ -283,13 +283,9 @@ router.post('/checkout', optionalAuth, async (req, res) => {
 
         const currentProduct = freshProduct || product;
 
-        if (!currentProduct) {
-          console.warn(`[Checkout] Critical: Product ${product.id} not found in DB during fresh fetch.`);
-          continue;
-        }
-
-        if (currentProduct.stock < cartItem.quantity) {
-          console.warn(`[Checkout] Processing order despite low stock for ${currentProduct.name}`);
+        if (!Number.isFinite(Number(currentProduct.price)) || Number(currentProduct.price) < 0 ||
+            !Number.isSafeInteger(Number(currentProduct.stock)) || Number(currentProduct.stock) < cartItem.quantity) {
+          return res.status(409).json({ error: `Item unavailable: ${currentProduct.name}` });
         }
 
         orderItems.push({
@@ -300,42 +296,41 @@ router.post('/checkout', optionalAuth, async (req, res) => {
           image_url: currentProduct.image_url
         });
 
-        subtotal += currentProduct.price * cartItem.quantity;
+        subtotal += Number(currentProduct.price) * cartItem.quantity;
       }
     } else {
       // High-resilience fallback to manualItems if DB cart is empty (local persistence fallback)
       for (const mItem of manualItems) {
-        let product;
-        const { data: dbProduct } = await supabase.from('products').select('*').eq('id', mItem.product_id).single();
-        
-        if (dbProduct) {
-          product = dbProduct;
-        } else {
-          // If not in DB, fallback to store static products (support for frontend uncached string IDs)
-          product = fallbackProducts.find(p => p.id === mItem.product_id);
+        if (!mItem || !mItem.product_id || invalidQuantity(mItem.quantity)) {
+          return res.status(400).json({ error: 'Cart contains an invalid item' });
+        }
+        // Checkout must use the current database price and stock, not bundled
+        // catalog data which may be stale or never imported.
+        const { data: product, error: productError } = await supabase
+          .from('products').select('*').eq('id', mItem.product_id).single();
+        if (productError || !product) {
+          return res.status(409).json({ error: 'An item is unavailable; please refresh your cart' });
         }
 
-        if (!product) {
-          console.warn(`[Checkout] Manual item product not found: ${mItem.product_id}. Skipping.`);
-          continue;
-        }
-
-        if (product.stock !== undefined && product.stock < mItem.quantity) {
-          console.warn(`[Checkout] Processing manual order despite low stock for ${product.name}`);
+        if (!product || !Number.isFinite(Number(product.price)) || Number(product.price) < 0 ||
+            !Number.isSafeInteger(Number(product.stock)) || Number(product.stock) < mItem.quantity) {
+          return res.status(409).json({ error: 'An item is unavailable; please refresh your cart' });
         }
         orderItems.push({
           product_id: product.id,
           name: product.name,
           price: product.price, // Force server-side price to prevent manipulation
           quantity: mItem.quantity,
-          image_url: product.image_url || product.image
+          image_url: product.image_url
         });
-        subtotal += product.price * mItem.quantity;
+        subtotal += Number(product.price) * mItem.quantity;
       }
     }
 
+    if (!orderItems.length) return res.status(400).json({ error: 'Cart is empty' });
+    if (subtotal < 500) return res.status(400).json({ error: 'Minimum order amount is £500' });
     const shipping = subtotal >= 50 ? 0 : 4.99;
-    const orderTotal = manualTotal || subtotal + shipping;
+    const orderTotal = subtotal + shipping;
 
     // Create shipping address record
     let shippingAddressId = null;
@@ -386,11 +381,15 @@ router.post('/checkout', optionalAuth, async (req, res) => {
 
     // Create order items and deduct stock
     for (const item of orderItems) {
-      await supabase.from('order_items').insert({
+      const { error: itemError } = await supabase.from('order_items').insert({
         order_id: newOrder.id,
         product_id: item.product_id,
-        quantity: item.quantity
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image_url: item.image_url
       });
+      if (itemError) throw itemError;
 
       // Deduct stock from product inventory
       const { data: product } = await supabase
@@ -410,7 +409,7 @@ router.post('/checkout', optionalAuth, async (req, res) => {
       }
     }
 
-    if (paymentMethod !== 'payfast') {
+    if (paymentMethod !== 'payfast' && cart?.id) {
       await supabase.from('cart_items').delete().eq('cart_id', cart.id);
     }
 
@@ -432,16 +431,36 @@ router.post('/checkout', optionalAuth, async (req, res) => {
 });
 
 // Initialize Paystack payment (Standard Redirect)
-router.post('/paystack/initialize', async (req, res) => {
+router.post('/paystack/initialize', optionalAuth, async (req, res) => {
   try {
+    const { orderId } = req.body;
+    if (!supabase) return res.status(503).json({ error: 'Payments are temporarily unavailable' });
+    if (!orderId) return res.status(400).json({ error: 'Order ID required' });
+
+    const { data: order, error: orderError } = await supabase.from('orders').select('*').eq('id', orderId).single();
+    if (orderError || !order) return res.status(404).json({ error: 'Order not found' });
+    const sessionId = validGuestSession(req);
+    if (!(req.user && order.user_id === req.user.id) &&
+        !(sessionId && order.session_id === sessionId)) {
+      return res.status(403).json({ error: 'Order access denied' });
+    }
+    if (order.status !== 'pending' || order.payment_method !== 'paystack') {
+      return res.status(409).json({ error: 'Order is not awaiting Paystack payment' });
+    }
+
     // --- GET CUSTOM KEYS FROM SETTINGS ---
     const paystackSettings = await getSetting('paystack', {});
-    const { orderId, email, amount: providedAmount, currency: providedCurrency } = req.body;
-    
     // Use environment variables for sensitive keys (DO NOT hardcode secrets)
     const SECRET_KEY = paystackSettings.secretKey || process.env.PAYSTACK_SECRET_KEY;
-    const PUBLIC_KEY = paystackSettings.publicKey || process.env.PAYSTACK_PUBLIC_KEY;
-    const targetCurrency = paystackSettings.currency || providedCurrency || 'ZAR';
+    const targetCurrency = (paystackSettings.currency || process.env.PAYSTACK_CURRENCY || '').toUpperCase();
+    const amount = Number(order.total);
+    if (!Number.isFinite(amount) || amount <= 0 || targetCurrency !== order.currency) {
+      return res.status(409).json({ error: 'Payment currency is not configured for this order' });
+    }
+    let shippingDetails = {};
+    try { shippingDetails = JSON.parse(order.notes || '{}').shippingAddress || {}; } catch {}
+    const email = shippingDetails.email;
+    if (!email) return res.status(409).json({ error: 'Order email is missing' });
 
     if (!SECRET_KEY) {
       console.error('CRITICAL: PAYSTACK_SECRET_KEY is missing from environment or settings!');
@@ -454,10 +473,10 @@ router.post('/paystack/initialize', async (req, res) => {
       'https://api.paystack.co/transaction/initialize',
       {
         email,
-        amount: Math.round(providedAmount * 100), // Amount in kobo/cents
+        amount: Math.round(amount * 100), // Provider amount comes from the stored order.
         currency: targetCurrency,
         reference: orderId,
-        callback_url: `https://${req.get('host')}/order-confirmation/${orderId}`
+        callback_url: `${PUBLIC_SITE_URL}/order-confirmation/${orderId}`
       },
       {
         headers: {
@@ -479,31 +498,24 @@ router.post('/paystack/initialize', async (req, res) => {
 // Generate PayFast payload
 router.post('/payfast/generate', optionalAuth, async (req, res) => {
   try {
-    const { orderId, amountUSD: providedUSD } = req.body;
+    const { orderId } = req.body;
 
-    // --- FALLBACK IF SUPABASE IS NOT CONFIGURED ---
-    let order = null;
-    if (!supabase) {
-      console.log('⚠️  Using mockup PayFast payload (Supabase not configured)');
-      order = {
-        id: orderId,
-        order_number: `ORD-MOCK-${Date.now()}`,
-        total: 100.00, // Default for mock if not provided
-        currency: 'GBP',
-        notes: JSON.stringify({ shippingAddress: { email: 'customer@fujicard.com' } })
-      };
-    } else {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', orderId)
-        .single();
-      
-      if (error || !data) {
-        console.error('Fetch order error for PayFast:', error);
-        return res.status(404).json({ error: 'Order not found' });
-      }
-      order = data;
+    if (!supabase) return res.status(503).json({ error: 'Payments are temporarily unavailable' });
+    if (!orderId) return res.status(400).json({ error: 'Order ID required' });
+    const { data: order, error } = await supabase.from('orders').select('*').eq('id', orderId).single();
+    if (error || !order) return res.status(404).json({ error: 'Order not found' });
+    const sessionId = validGuestSession(req);
+    if (!(req.user && order.user_id === req.user.id) &&
+        !(sessionId && order.session_id === sessionId)) {
+      return res.status(403).json({ error: 'Order access denied' });
+    }
+    if (order.status !== 'pending' || order.payment_method !== 'payfast') {
+      return res.status(409).json({ error: 'Order is not awaiting PayFast payment' });
+    }
+    // PayFast charges ZAR. No exchange rate or converted amount is stored on
+    // GBP orders, so a GBP order cannot be charged safely through this route.
+    if (order.currency !== 'ZAR' || !Number.isFinite(Number(order.total)) || Number(order.total) <= 0) {
+      return res.status(409).json({ error: 'PayFast requires a verified ZAR order total' });
     }
 
     let shippingDetails = {};
@@ -514,20 +526,6 @@ router.post('/payfast/generate', optionalAuth, async (req, res) => {
       }
     } catch (e) {
       console.error('Could not parse order notes:', e);
-    }
-
-    let host = req.get('host');
-    let protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-    let baseUrl = `${protocol}://${host}`;
-
-    // Many times, frontend origin is needed to redirect back.
-    let originUrl = (req.get('origin') || 'http://localhost:5173').replace(/\/$/, ""); // REMOVE TRAILING SLASH
-    
-    // We only spoof the notify_url so the sandbox hash verification doesn't restrict the ping.
-    let spoofedBaseUrl = baseUrl.replace(/\/$/, "");
-    const isLocal = originUrl.includes('localhost') || originUrl.includes('127.0.0.1');
-    if (isLocal) {
-      spoofedBaseUrl = 'https://fuji-card.com';
     }
 
     // PERSISTENT CONFIG
@@ -553,14 +551,10 @@ router.post('/payfast/generate', optionalAuth, async (req, res) => {
     payloadData.merchant_id = MERCHANT_ID;
     payloadData.merchant_key = MERCHANT_KEY;
 
-    // --- Return URLs (only add if we have a real public domain to avoid WAF 403 on localhost) ---
-    if (!isLocal) {
-      payloadData.return_url = `${originUrl}/order-confirmation/${order.id}`;
-      payloadData.cancel_url = `${originUrl}/cart`;
-    }
+    payloadData.return_url = `${PUBLIC_SITE_URL}/order-confirmation/${order.id}`;
+    payloadData.cancel_url = `${PUBLIC_SITE_URL}/cart`;
 
-    // --- Notify URL: always use current site URL for signature consistency ---
-    payloadData.notify_url = `${baseUrl}/api/orders/payfast/notify`;
+    payloadData.notify_url = `${PUBLIC_SITE_URL}/api/orders/payfast/notify`;
 
     // --- Buyer info ---
     payloadData.name_first = shippingDetails.firstName || 'Customer';
@@ -570,9 +564,7 @@ router.post('/payfast/generate', optionalAuth, async (req, res) => {
     // --- Transaction info ---
     payloadData.m_payment_id = String(order.id);
     
-    // Priority: 1. Provided USD from frontend, 2. Order total (assuming order.total is in USD)
-    const finalUSD = providedUSD || parseFloat(order.total).toFixed(2);
-    payloadData.amount = parseFloat(finalUSD).toFixed(2);
+    payloadData.amount = Number(order.total).toFixed(2);
     
     // Use a simple item name to minimize encoding errors
     payloadData.item_name = `Order_${order.order_number}`.replace(/\s+/g, "_");
@@ -580,8 +572,6 @@ router.post('/payfast/generate', optionalAuth, async (req, res) => {
     // --- Generate signature AFTER all fields are set ---
     const signature = generatePayfastSignature(payloadData, PASSPHRASE || null);
     payloadData.signature = signature;
-
-    console.log('[PayFast] Final payload (USD):', { ...payloadData, amount: payloadData.amount });
 
     res.json({
       url: PAYFAST_URL,
@@ -665,15 +655,28 @@ router.post('/payfast/notify', async (req, res) => {
 // Restore cart and stock on payment failure/cancellation
 router.post('/:id/restore-cart', optionalAuth, async (req, res) => {
   try {
+    if (!supabase) return res.status(503).json({ error: 'Order restoration is temporarily unavailable' });
     const orderId = req.params.id;
     const { data: order, error: orderErr } = await supabase.from('orders').select('*, order_items(*)').eq('id', orderId).single();
 
     if (orderErr || !order) return res.status(404).json({ error: 'Order not found' });
+    const sessionId = validGuestSession(req);
+    const isOwner = order.user_id
+      ? !!(req.user && req.user.id === order.user_id)
+      : !!(order.session_id && order.session_id !== 'guest' && sessionId === order.session_id);
+    if (!isOwner) return res.status(403).json({ error: 'Order access denied' });
     if (order.status === 'cancelled') return res.json({ success: true, message: 'Already cancelled' });
     if (order.status !== 'pending') return res.status(400).json({ error: 'Only pending orders can be restored' });
 
-    // 1. Mark order as cancelled
-    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
+    // Only one cancellation may claim the pending order and restore its stock.
+    const { data: cancelled, error: cancelError } = await supabase.from('orders')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .eq('status', 'pending')
+      .select('id')
+      .maybeSingle();
+    if (cancelError) throw cancelError;
+    if (!cancelled) return res.status(409).json({ error: 'Order status changed; refresh and try again' });
 
     // 2. Restore stock
     if (order.order_items && order.order_items.length > 0) {
@@ -686,9 +689,12 @@ router.post('/:id/restore-cart', optionalAuth, async (req, res) => {
     }
 
     // 3. Rebuild the cart
-    const cartKey = order.session_id || 'guest';
-    let { data: cart } = await supabase.from('carts').select('*').or(`user_id.eq.${order.user_id},session_id.eq.${cartKey}`);
-    let targetCart = cart && cart.length > 0 ? cart[0] : null;
+    const cartKey = order.user_id || order.session_id;
+    let { data: targetCart } = await supabase.from('carts').select('*').eq('session_id', cartKey).maybeSingle();
+    if (!targetCart && order.user_id) {
+      const { data: userCart } = await supabase.from('carts').select('*').eq('user_id', order.user_id).maybeSingle();
+      targetCart = userCart;
+    }
 
     if (!targetCart) {
       const { data: newCart } = await supabase.from('carts').insert({ user_id: order.user_id || null, session_id: cartKey }).select().single();

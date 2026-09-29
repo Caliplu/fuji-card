@@ -47,12 +47,12 @@ export const CartProvider = ({ children }) => {
 
   // Generate session ID for guest cart
   useEffect(() => {
-    if (!localStorage.getItem('sessionId') && !localStorage.getItem('token')) {
-      localStorage.setItem('sessionId', `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+    if (!localStorage.getItem('token') && !/^guest_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(localStorage.getItem('sessionId') || '')) {
+      localStorage.setItem('sessionId', `guest_${crypto.randomUUID()}`);
     }
     // Initialize cart from local storage for instant UI visibility
     setCart(getLocalCart());
-  }, [getLocalCart]);
+  }, [getLocalCart, isAuthenticated]);
 
   const fetchCart = useCallback(async () => {
     try {

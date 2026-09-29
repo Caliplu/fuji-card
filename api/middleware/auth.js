@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../config/auth.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fujicard-secret-key-2024';
 
 export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];

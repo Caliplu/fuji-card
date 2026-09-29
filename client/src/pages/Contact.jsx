@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
 import './Contact.css';
 
+const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL?.trim() || '';
+const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || '';
+
 const Contact = () => {
-    const [submitted, setSubmitted] = useState(false);
     const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Storing in memory (React State simulated)
-        console.log('[Contact Form] In-memory submission received:', formData);
-        setSubmitted(true);
-        // Reset form after delay
-        setTimeout(() => {
-            setSubmitted(false);
-            setFormData({ name: '', email: '', subject: '', message: '' });
-        }, 5000);
+        const subject = encodeURIComponent(formData.subject);
+        const body = encodeURIComponent(`Name: ${formData.name}\nReply to: ${formData.email}\n\n${formData.message}`);
+        if (supportEmail) {
+            window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
+        }
     };
 
     const handleChange = (e) => {
@@ -27,7 +26,7 @@ const Contact = () => {
             <div className="warning-banner">
                 <p>
                     <i className="fa-solid fa-triangle-exclamation"></i>
-                    Beware of Fake Accounts: Please be cautious of accounts pretending to be FUJI CARD SHOP. <a href="#">Learn more</a>
+                    Beware of fake accounts pretending to be Fuji Card. Only use contact details shown on this website.
                 </p>
             </div>
 
@@ -35,19 +34,13 @@ const Contact = () => {
                 <section className="hero-section">
                     <h1>We are here to help</h1>
                     <p className="subtitle">
-                        If you have any questions or inquiries,<br />
-                        please feel free to fill in the form.
+                        {supportEmail
+                            ? 'Fill in the form to open your email app, then press Send there.'
+                            : instagramUrl ? 'Email support is being set up. You can contact us on Instagram.' : 'Support contact details are being set up.'}
                     </p>
                 </section>
 
-                <section className="form-section">
-                    {submitted ? (
-                        <div className="success-card">
-                            <i className="fa-solid fa-circle-check"></i>
-                            <h2>Form Submitted Successfully!</h2>
-                            <p>Thank you for reaching out. We will get back to you shortly.</p>
-                        </div>
-                    ) : (
+                {supportEmail && <section className="form-section">
                         <form className="premium-contact-form" onSubmit={handleSubmit}>
                             <div className="form-grid">
                                 <div className="form-group">
@@ -67,25 +60,24 @@ const Contact = () => {
                                 <label>Your Message</label>
                                 <textarea name="message" rows="5" placeholder="How can we help you today?" value={formData.message} onChange={handleChange} required></textarea>
                             </div>
-                            <button type="submit" className="submit-btn-premium">Send Message</button>
+                            <button type="submit" className="submit-btn-premium">Open Email App</button>
                         </form>
-                    )}
-                </section>
+                </section>}
 
                 <section className="contact-info-section">
                     <div className="info-card">
-                        <p>You can also reach out to us on<br />Instagram or via email.</p>
+                        <p>{supportEmail || instagramUrl ? 'Contact Fuji Card using the details below.' : 'Contact details will appear here when they are ready.'}</p>
                         <div className="info-links">
-                            <div className="info-item">
+                            {instagramUrl && <div className="info-item">
                                 <i className="fa-brands fa-instagram" style={{ color: '#E1306C', marginRight: '10px' }}></i>
                                 <strong>Instagram : </strong>
-                                <a href="https://www.instagram.com/fuji_cards?igsh=MXZybHY2anNwenJrZw%3D%3D&utm_source=qr" target="_blank" rel="noreferrer">@fuji_cards</a>
-                            </div>
-                            <div className="info-item">
+                                <a href={instagramUrl} target="_blank" rel="noreferrer">Instagram</a>
+                            </div>}
+                            {supportEmail && <div className="info-item">
                                 <i className="fa-solid fa-envelope" style={{ color: '#3b82f6', marginRight: '10px' }}></i>
                                 <strong>Email : </strong>
-                                <a href="mailto:fujicard@fuji-card.com">fujicard@fuji-card.com</a>
-                            </div>
+                                <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
+                            </div>}
                         </div>
                     </div>
                 </section>

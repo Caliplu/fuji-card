@@ -30,28 +30,13 @@ const ProductDetail = () => {
       setLoading(true);
       setImageError(false);
       
-      try {
-        const response = await productsAPI.getOne(id, { params: { _t: Date.now() } });
-        console.log('Product API response:', response.data);
-        setProduct(response.data.product);
-        setRelated(response.data.related || []);
-      } catch (apiError) {
-        console.warn('ProductDetail API failed, attempting local fallback');
-        // Import local store on demand or ensure it's imported
-        const { localProductStore } = await import('../data/products');
-        const localProduct = localProductStore.find(p => p.id === id);
-        
-        if (localProduct) {
-          setProduct(localProduct);
-          // Simple related products logic: same category
-          const sameCategory = localProductStore.filter(p => p.category === localProduct.category && p.id !== id);
-          setRelated(sameCategory.slice(0, 4));
-        } else {
-          throw apiError; // Re-throw if even local fails
-        }
-      }
+      const response = await productsAPI.getOne(id, { params: { _t: Date.now() } });
+      setProduct(response.data.product);
+      setRelated(response.data.related || []);
     } catch (error) {
       console.error('Failed to fetch product:', error);
+      setProduct(null);
+      setRelated([]);
     } finally {
       setLoading(false);
     }
@@ -92,7 +77,7 @@ const ProductDetail = () => {
     );
   }
 
-  const placeholderImage = `https://via.placeholder.com/400x500?text=${encodeURIComponent(product.name)}`;
+  const placeholderImage = '/logo.png';
 
   return (
     <div className="product-detail-page">
@@ -111,7 +96,7 @@ const ProductDetail = () => {
           <div className="product-image-section">
             <div className="main-image">
               <img 
-                src={imageError ? placeholderImage : (product.image || product.image_url)} 
+                src={imageError ? placeholderImage : (product.image || product.image_url || placeholderImage)} 
                 alt={product.name}
                 onError={() => setImageError(true)}
               />

@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import ProductCard from '../components/ProductCard';
 import PriceRange from '../components/PriceRange';
-import { localProductStore } from '../data/products'; // DRY: Local fallback
 import './Products.css';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -15,6 +14,7 @@ const Products = () => {
   const [filterOptions, setFilterOptions] = useState({});
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const category = searchParams.get('category') || '';
   const search = searchParams.get('search') || '';
@@ -22,30 +22,12 @@ const Products = () => {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const params = Object.fromEntries(searchParams.entries());
-      params._t = Date.now(); // Cache busting
-      let combined = [];
-
-      try {
-        const fetchParams = { ...params, limit: 1000 };
-        const response = await axios.get(`${API_URL}/products`, { params: fetchParams });
-        combined = response.data?.products || [];
-      } catch (apiError) {
-        console.warn('API fetch failed, using local fallback only');
-      }
-      
-      // --- DUAL SOURCE MERGE (API + LOCAL) ---
-      const localItems = [...localProductStore];
-      
-      // Combine and De-duplicate by ID or Name
-      localItems.forEach(localItem => {
-        if (!combined.find(p => p.id === localItem.id || (p.name && localItem.name && p.name.toLowerCase() === localItem.name.toLowerCase()))) {
-          combined.push(localItem);
-        }
-      });
+      const response = await axios.get(`${API_URL}/products`, { params: { ...params, limit: 1000 } });
       
       // Manual Filtering across everything
-      let filtered = combined;
+      let filtered = response.data?.products || [];
       
       if (category) {
         filtered = filtered.filter(p => {
@@ -110,7 +92,8 @@ const Products = () => {
         currentPage: 1
       });
     } catch (error) {
-      console.error('Final product load failure:', error);
+      console.error('Product load failure:', error);
+      setLoadError(true);
       setProducts([]);
     } finally {
       setLoading(false);
@@ -122,9 +105,7 @@ const Products = () => {
       const response = await axios.get(`${API_URL}/products/filters/options`, { params: { category } });
       setFilterOptions(response.data);
     } catch (error) {
-      const cats = Array.from(new Set(localProductStore.map(p => p.category)));
-      const rarities = Array.from(new Set(localProductStore.map(p => p.rarity).filter(Boolean)));
-      setFilterOptions({ categories: cats, rarities });
+      setFilterOptions({ rarities: [], conditions: [], languages: [], sets: [] });
     }
   }, [category]);
 
@@ -221,6 +202,12 @@ const Products = () => {
               <div className="loading-state">
                 <div className="spinner"></div>
                 <p>Curating your collection...</p>
+              </div>
+            ) : loadError ? (
+              <div className="no-results">
+                <h3>Products are temporarily unavailable</h3>
+                <p>Please try again shortly.</p>
+                <button onClick={fetchProducts} className="btn btn-primary">Try Again</button>
               </div>
             ) : products.length === 0 ? (
               <div className="no-results">

@@ -13,7 +13,7 @@ const AuthHeader = () => {
               <line x1="12" y1="17" x2="12" y2="21"></line>
             </svg>
           </div>
-          <span className="logo-text">Fuji Card Shop</span>
+          <span className="logo-text">Fuji Card</span>
         </Link>
       </div>
     </header>
