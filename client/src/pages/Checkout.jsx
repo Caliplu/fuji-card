@@ -117,7 +117,8 @@ const Checkout = () => {
     try {
       await clearCart();
     } catch (e) {
-      // Cart clear failure shouldn't stop the redirect
+      alert('Your cart could not be cleared. Please try again.');
+      return;
     }
     navigate('/');
   };
