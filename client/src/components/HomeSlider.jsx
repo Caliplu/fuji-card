@@ -8,10 +8,10 @@ const HomeSlider = () => {
     {
       id: 1,
       image: '/slideshow/M4-back-300x167.webp',
-      title: 'Pre-Order Start!!',
+      title: 'Explore the Collection',
       subtitle: 'M4 Ninja Spinner',
-      info: 'Releasing on March 13!',
-      buttonText: 'ORDER NOW!',
+      info: 'Browse Japanese trading cards',
+      buttonText: 'VIEW PRODUCTS',
       link: '/products?search=ninja'
     },
     {
