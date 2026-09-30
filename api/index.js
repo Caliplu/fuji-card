@@ -9,6 +9,7 @@ import cartRoutes from './routes/cart.js';
 import orderRoutes from './routes/orders.js';
 import categoryRoutes from './routes/categories.js';
 import adminRoutes from './routes/admin.js';
+import { supabase } from './config/supabase.js';
 
 console.log('Backend starting up...');
 process.on('uncaughtException', (err) => {
@@ -50,6 +51,23 @@ app.get('/api/currencies', (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Fuji Card API is running' });
+});
+
+// Readiness includes the catalog dependency; health above only checks the process.
+app.get('/api/ready', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!supabase) return res.status(503).json({ status: 'unavailable', catalog: 'unavailable' });
+
+  try {
+    const { data, error } = await supabase.from('products')
+      .select('id, categories!inner(id)').limit(1);
+    if (error) throw error;
+    if (!data?.length) return res.status(503).json({ status: 'unavailable', catalog: 'empty' });
+    res.json({ status: 'OK', catalog: 'OK' });
+  } catch (error) {
+    console.error('Catalog readiness error:', error);
+    res.status(503).json({ status: 'unavailable', catalog: 'unavailable' });
+  }
 });
 
 
