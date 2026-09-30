@@ -3,7 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
-import { ordersAPI } from '../services/api';
+import { ordersAPI, cartAPI } from '../services/api';
 import './Checkout.css';
 import './CheckoutPayment.css';
 
@@ -48,7 +48,7 @@ const Checkout = () => {
 
   const [requestSent, setRequestSent] = useState(false);
 
-  const sendWhatsAppOrder = () => {
+  const sendWhatsAppOrder = (verifiedCart) => {
     const whatsappNumber = orderWhatsAppNumber;
 
     // Create highly professional and fully detailed order message
@@ -67,10 +67,10 @@ const Checkout = () => {
 
     // Items Section
     message += `📦 *ASSET SUMMARY*\n`;
-    cart.items.forEach((item, index) => {
+    verifiedCart.items.forEach((item, index) => {
       // Correctly extract nested product properties and format the prices
       const productName = item.product?.name || item.name || 'Pokemon Card';
-      const rawPrice = parseFloat(item.price || item.product?.price || 0);
+      const rawPrice = Number(item.product.price);
 
       message += `[Item ${index + 1}] *${productName}*\n`;
       message += `   • Quantity: ${item.quantity}\n`;
@@ -78,10 +78,12 @@ const Checkout = () => {
       message += `   • Line Total: ${getSymbol()}${convertPrice(rawPrice * item.quantity)}\n\n`;
     });
 
+    const verifiedSubtotal = verifiedCart.items.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
+
     // Request only; the store must confirm inventory, shipping and final price.
     message += `──────────────\n`;
     message += `💰 *ITEMS SUBTOTAL (GBP)*\n`;
-    message += `• Listed items: ${getSymbol()}${convertPrice(subtotal)}\n`;
+    message += `• Listed items: ${getSymbol()}${convertPrice(verifiedSubtotal)}\n`;
     message += `• Shipping and final amount: to be confirmed by Fuji Card\n`;
     message += `──────────────\n\n`;
 
@@ -193,7 +195,19 @@ const Checkout = () => {
 
     setLoading(true);
     try {
-      sendWhatsAppOrder();
+      const { data: verifiedCart } = await cartAPI.get();
+      if (!Array.isArray(verifiedCart?.items) || verifiedCart.items.length === 0 ||
+          verifiedCart.items.some(item => !item.product || !Number.isFinite(Number(item.product.price)) ||
+            !Number.isSafeInteger(item.quantity) || item.quantity < 1 ||
+            item.quantity > Number(item.product.stock))) {
+        alert('Your cart changed or an item is unavailable. Refresh your cart before requesting an order.');
+        await refreshCart();
+        return;
+      }
+      sendWhatsAppOrder(verifiedCart);
+    } catch (error) {
+      console.error('Could not verify cart before order request:', error);
+      alert('Your cart could not be verified. Please try again later.');
     } finally {
       setLoading(false);
     }
