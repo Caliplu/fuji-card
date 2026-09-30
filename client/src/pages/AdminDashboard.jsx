@@ -265,7 +265,7 @@ const AdminDashboard = () => {
     const handleEditClick = (product, defaultCategory = 'pokemon') => {
         setIsEditing(product.id || 'new');
         setEditForm(product.id ? { ...product } : {
-            name: '', description: '', price: 0, category_name: product.category_name || selectedCategory || defaultCategory, image_url: '', stock: 10, condition: 'Mint'
+            name: '', description: '', price: 0, category_name: product.category_name || selectedCategory || defaultCategory, image_url: '', stock: 0, condition: 'Mint'
         });
     };
 
@@ -794,7 +794,7 @@ const AdminDashboard = () => {
                                 </div>
                                 <div className="form-group-admin">
                                     <label>Stock Count</label>
-                                    <input type="number" name="stock" value={editForm.stock || 0} onChange={handleFormChange} required />
+                                    <input type="number" min="0" step="1" name="stock" value={editForm.stock ?? 0} onChange={handleFormChange} required />
                                 </div>
                                 <div className="form-group-admin">
                                     <label>Classification (Subcategory/Type)</label>
