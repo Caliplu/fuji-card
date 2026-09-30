@@ -12,6 +12,7 @@ const ProductDetail = () => {
   const [related, setRelated] = useState([]);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [adding, setAdding] = useState(false);
   const [imageError, setImageError] = useState(false);
   const { addToCart } = useCart();
@@ -28,6 +29,7 @@ const ProductDetail = () => {
     try {
       console.log('Fetching product with id:', id);
       setLoading(true);
+      setLoadError(false);
       setImageError(false);
       
       const response = await productsAPI.getOne(id, { params: { _t: Date.now() } });
@@ -37,6 +39,7 @@ const ProductDetail = () => {
       console.error('Failed to fetch product:', error);
       setProduct(null);
       setRelated([]);
+      setLoadError(error.response?.status !== 404);
     } finally {
       setLoading(false);
     }
@@ -69,8 +72,15 @@ const ProductDetail = () => {
       <div className="product-detail-page">
         <div className="container">
           <div className="not-found">
-            <h2>Product not found</h2>
-            <Link to="/products" className="btn btn-primary">Browse Products</Link>
+            <h2>{loadError ? 'Product temporarily unavailable' : 'Product not found'}</h2>
+            {loadError ? (
+              <>
+                <p>Please try again shortly.</p>
+                <button onClick={fetchProduct} className="btn btn-primary">Try Again</button>
+              </>
+            ) : (
+              <Link to="/products" className="btn btn-primary">Browse Products</Link>
+            )}
           </div>
         </div>
       </div>

@@ -46,7 +46,7 @@ const PremiumProductCard = ({ product }) => {
               onClick={handleAddToCart}
               disabled={adding || product.stock === 0}
             >
-              {adding ? 'ADDING...' : 'ADD TO CART'}
+              {adding ? 'ADDING...' : product.stock === 0 ? 'SOLD OUT' : 'ADD TO CART'}
             </button>
           </div>
         </div>
