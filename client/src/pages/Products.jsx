@@ -141,7 +141,8 @@ const Products = () => {
       pokemon: 'Pokemon TCG',
       onepiece: 'One Piece Card Game',
       yugioh: 'Yu-Gi-Oh! OCG/TCG',
-      accessories: 'Premium Accessories'
+      accessories: 'Premium Accessories',
+      other: 'Other Collectibles'
     };
     return titles[category] || 'All Collectibles';
   };
@@ -179,13 +180,13 @@ const Products = () => {
              <div className="filter-group">
                <h4>TCG Category</h4>
                <div className="filter-links">
-                 {['pokemon', 'onepiece', 'yugioh', 'accessories'].map(cat => (
+                 {['pokemon', 'onepiece', 'yugioh', 'accessories', 'other'].map(cat => (
                    <button 
                      key={cat} 
                      className={category === cat ? 'active' : ''} 
                      onClick={() => handleFilterChange('category', cat)}
                    >
-                     {cat.toUpperCase()}
+                     {cat === 'other' ? 'OTHER COLLECTIBLES' : cat.toUpperCase()}
                    </button>
                  ))}
                </div>
