@@ -143,6 +143,9 @@ router.post('/add', async (req, res) => {
       const cart = memoryCarts[cartKey];
 
       const existingItem = cart.items.find(item => item.product_id === productId);
+      if (quantity + (existingItem?.quantity || 0) > Number(product.stock)) {
+        return res.status(409).json({ error: 'Not enough stock available' });
+      }
       if (existingItem) {
         existingItem.quantity += quantity;
       } else {
@@ -158,7 +161,7 @@ router.post('/add', async (req, res) => {
     // Parallelize product stock check and cart lookup
     const [productRes, cartRes] = await Promise.all([
       supabase.from('products').select('id, stock, price').eq('id', productId).single(),
-      supabase.from('carts').select('*').eq('session_id', cartKey).single()
+      supabase.from('carts').select('*').eq('session_id', cartKey).maybeSingle()
     ]);
 
     const { data: product, error: productError } = productRes;
@@ -172,37 +175,46 @@ router.post('/add', async (req, res) => {
       return res.status(400).json({ error: 'Not enough stock available' });
     }
 
-    if (cartError || !cart) {
+    if (cartError) throw cartError;
+    if (!cart) {
       const { data: newCart, error: insertError } = await supabase
         .from('carts')
         .insert({ session_id: cartKey })
         .select()
         .single();
+      if (insertError) throw insertError;
       cart = newCart;
     }
 
     // Check if item already in cart
-    const { data: existingItem } = await supabase
+    const { data: existingItem, error: existingError } = await supabase
       .from('cart_items')
-      .select('*')
+      .select('id, quantity')
       .eq('cart_id', cart.id)
       .eq('product_id', productId)
-      .single();
+      .maybeSingle();
+    if (existingError) throw existingError;
+
+    const newQuantity = (existingItem?.quantity || 0) + quantity;
+    if (newQuantity > Number(product.stock)) {
+      return res.status(409).json({ error: 'Not enough stock available' });
+    }
 
     if (existingItem) {
-      const newQuantity = existingItem.quantity + quantity;
-      await supabase
+      const { error } = await supabase
         .from('cart_items')
         .update({ quantity: newQuantity, updated_at: new Date().toISOString() })
         .eq('id', existingItem.id);
+      if (error) throw error;
     } else {
-      await supabase
+      const { error } = await supabase
         .from('cart_items')
         .insert({
           cart_id: cart.id,
           product_id: productId,
           quantity: quantity
         });
+      if (error) throw error;
     }
 
     res.json({ success: true, message: 'Added to cart' });
