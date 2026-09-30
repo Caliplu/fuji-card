@@ -254,19 +254,16 @@ router.post('/products', async (req, res) => {
     try {
         const newProduct = req.body;
 
-        // Prevent stock from being set to 0 or below - minimum is 1 unit
+        // Allow zero stock so sold-out products can be marked unavailable
         if (newProduct.stock !== undefined) {
-            const stockValue = parseInt(newProduct.stock, 10);
-            if (isNaN(stockValue) || stockValue < 1) {
-                return res.status(400).json({ 
-                    error: 'Invalid stock value. Stock must be at least 1 unit.',
-                    details: 'All new products must have at least 1 unit in inventory.'
-                });
+            const stockValue = Number(newProduct.stock);
+            if (newProduct.stock === '' || newProduct.stock === null || !Number.isSafeInteger(stockValue) || stockValue < 0) {
+                return res.status(400).json({ error: 'Stock must be a non-negative whole number.' });
             }
             newProduct.stock = stockValue;
         } else {
-            // Default to 1 if not specified
-            newProduct.stock = 1;
+            // Do not claim inventory that has not been entered.
+            newProduct.stock = 0;
         }
 
         // Ensure you use the right category_id - for now assume client sends it or map name -> id
@@ -364,14 +361,11 @@ router.put('/products/:id', async (req, res) => {
     try {
         const updateData = req.body;
 
-        // Prevent stock from being set to 0 or below - minimum is 1 unit to keep card available
+        // Allow zero stock so sold-out products can be marked unavailable
         if (updateData.stock !== undefined) {
-            const stockValue = parseInt(updateData.stock, 10);
-            if (isNaN(stockValue) || stockValue < 1) {
-                return res.status(400).json({ 
-                    error: 'Invalid stock value. Stock must be at least 1 unit to keep the card available in the inventory.',
-                    details: 'Cards cannot be completely sold out. Use "Low Stock" section in dashboard to manage items with limited inventory.'
-                });
+            const stockValue = Number(updateData.stock);
+            if (updateData.stock === '' || updateData.stock === null || !Number.isSafeInteger(stockValue) || stockValue < 0) {
+                return res.status(400).json({ error: 'Stock must be a non-negative whole number.' });
             }
             updateData.stock = stockValue;
         }
