@@ -15,6 +15,7 @@ const AdminDashboard = () => {
     // Products State
     const [products, setProducts] = useState([]);
     const [supplierSearch, setSupplierSearch] = useState('');
+    const [imageSourceFilter, setImageSourceFilter] = useState('all');
     const [catalogLoadError, setCatalogLoadError] = useState(false);
     const [isEditing, setIsEditing] = useState(null);
     const [editForm, setEditForm] = useState({});
@@ -163,12 +164,13 @@ const AdminDashboard = () => {
             'product_id', 'name', 'category', 'set_name', 'language',
             'current_price_gbp', 'recorded_stock', 'supplier_sku',
             'supplier_available_quantity', 'supplier_unit_cost',
-            'lead_time_days', 'image_permission_or_url', 'quote_reference'
+            'lead_time_days', 'image_permission_or_url', 'quote_reference',
+            'current_image_url', 'current_image_source'
         ];
         const rows = products.map(product => [
             product.id, product.name, product.categories?.name || product.category,
             product.set_name || product.set, product.language, product.price, product.stock,
-            '', '', '', '', '', ''
+            '', '', '', '', '', '', product.image_url, getImageSource(product.image_url)
         ].map(cell).join(','));
         const csv = [columns.join(','), ...rows].join(String.fromCharCode(13, 10));
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -177,6 +179,16 @@ const AdminDashboard = () => {
         link.download = 'fuji-card-supplier-review.csv';
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
+    const getImageSource = imageUrl => {
+        if (!imageUrl) return 'Missing';
+        try {
+            const url = new URL(imageUrl, window.location.origin);
+            return url.origin === window.location.origin ? 'Fuji Card / local' : url.hostname;
+        } catch {
+            return 'Invalid URL';
+        }
     };
 
     const fetchCategories = async () => {
@@ -958,6 +970,7 @@ const AdminDashboard = () => {
                                     <div className="stat-card glass-panel"><h3>Catalog entries</h3><div className="stat-value">{products.length}</div></div>
                                     <div className="stat-card glass-panel"><h3>Recorded stock above zero</h3><div className="stat-value">{products.filter(p => Number(p.stock) > 0).length}</div></div>
                                     <div className="stat-card glass-panel"><h3>Missing images</h3><div className="stat-value">{products.filter(p => !p.image_url).length}</div></div>
+                                    <div className="stat-card glass-panel"><h3>External image sources</h3><div className="stat-value">{new Set(products.map(p => getImageSource(p.image_url)).filter(source => source !== 'Missing' && source !== 'Fuji Card / local')).size}</div></div>
                                 </div>
                                 <p>Recorded stock is the database value. Supplier availability has not been verified in this dashboard.</p>
                                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', margin: '1.5rem 0' }}>
@@ -966,18 +979,31 @@ const AdminDashboard = () => {
                                     <input aria-label="Search supplier review products" placeholder="Search name, set or ID"
                                         value={supplierSearch} onChange={event => setSupplierSearch(event.target.value)}
                                         style={{ padding: '.65rem', minWidth: '220px', flex: 1 }} />
+                                    <select aria-label="Filter image source" value={imageSourceFilter} onChange={event => setImageSourceFilter(event.target.value)} style={{ padding: '.65rem', minWidth: '190px' }}>
+                                        <option value="all">All image sources</option>
+                                        <option value="external">External images</option>
+                                        <option value="local">Fuji Card / local</option>
+                                        <option value="missing">Missing images</option>
+                                    </select>
                                 </div>
-                                <p>The CSV leaves supplier SKU, confirmed quantity, cost, lead time, image permission and quote reference blank for the supplier to complete. New products start at zero stock until you enter a confirmed quantity.</p>
+                                <p>The CSV includes each current image URL and source. Supplier SKU, confirmed quantity, cost, lead time, image permission and quote reference remain blank for the supplier to complete. New products start at zero stock until you enter a confirmed quantity.</p>
                                 <div style={{ overflowX: 'auto' }}>
                                     <table className="admin-table" style={{ width: '100%' }}>
-                                        <thead><tr><th>Product</th><th>Set / language</th><th>Recorded stock</th><th>Listed price</th><th>Action</th></tr></thead>
+                                        <thead><tr><th>Image</th><th>Product</th><th>Image source</th><th>Set / language</th><th>Recorded stock</th><th>Listed price</th><th>Action</th></tr></thead>
                                         <tbody>
                                             {products.filter(p => {
                                                 const term = supplierSearch.trim().toLowerCase();
-                                                return !term || [p.name, p.id, p.set_name, p.language].some(value => String(value || '').toLowerCase().includes(term));
+                                                const source = getImageSource(p.image_url);
+                                                const matchesSource = imageSourceFilter === 'all' ||
+                                                    (imageSourceFilter === 'external' && source !== 'Missing' && source !== 'Fuji Card / local') ||
+                                                    (imageSourceFilter === 'local' && source === 'Fuji Card / local') ||
+                                                    (imageSourceFilter === 'missing' && source === 'Missing');
+                                                return matchesSource && (!term || [p.name, p.id, p.set_name, p.language, source].some(value => String(value || '').toLowerCase().includes(term)));
                                             }).slice(0, 40).map(product => (
                                                 <tr key={product.id}>
+                                                    <td>{product.image_url ? <img src={product.image_url} alt="" loading="lazy" style={{ width: 48, height: 64, objectFit: 'contain' }} /> : '—'}</td>
                                                     <td>{product.name}</td>
+                                                    <td>{getImageSource(product.image_url)}</td>
                                                     <td>{product.set_name || '—'} / {product.language || '—'}</td>
                                                     <td>{product.stock}</td>
                                                     <td>£{Number(product.price).toFixed(2)}</td>
