@@ -24,75 +24,9 @@ const Products = () => {
       setLoading(true);
       setLoadError(false);
       const params = Object.fromEntries(searchParams.entries());
-      const response = await axios.get(`${API_URL}/products`, { params: { ...params, page: 1, limit: 1000 } });
-      
-      // Manual Filtering across everything
-      let filtered = response.data?.products || [];
-      
-      if (category) {
-        filtered = filtered.filter(p => {
-          const pCat = (p.categories?.name || p.category?.name || p.category || 'other').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
-          const targetCat = category.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return pCat === targetCat;
-        });
-      }
-      
-      if (search) {
-        const s = search.toLowerCase();
-        filtered = filtered.filter(p => 
-          p.name.toLowerCase().includes(s) || 
-          p.description?.toLowerCase().includes(s) ||
-          p.set?.toLowerCase().includes(s) ||
-          p.set_name?.toLowerCase().includes(s)
-        );
-      }
-
-      const type = searchParams.get('type');
-      if (type) {
-        const t = type.toLowerCase();
-        filtered = filtered.filter(p => {
-          const name = p.name.toLowerCase();
-          const desc = (p.description || '').toLowerCase();
-          
-          if (t === 'booster') return name.includes('booster') || desc.includes('booster');
-          if (t === 'special') return name.includes('special') || name.includes('high class') || desc.includes('special');
-          if (t === 'promo') return name.includes('promo') || desc.includes('promo');
-          if (t === 'sealed') return name.includes('sealed') || name.includes('case') || desc.includes('sealed');
-          
-          // OTHER TCG Types
-          if (t === 'weiss') return name.includes('weiss') || desc.includes('weiss');
-          if (t === 'union') return name.includes('union') || desc.includes('union');
-          if (t === 'hololive') return name.includes('hololive') || desc.includes('hololive');
-          if (t === 'lycee') return name.includes('lycee') || desc.includes('lycee');
-          if (t === 'gundam') return name.includes('gundam') || desc.includes('gundam');
-          if (t === 'dragonball') return name.includes('dragon ball') || name.includes('fusion') || desc.includes('dragon ball');
-          if (t === 'disney') return name.includes('lorcana') || name.includes('disney') || desc.includes('lorcana');
-          if (t === 'mtg') return name.includes('magic') || name.includes('mtg') || desc.includes('magic');
-
-          return true;
-        });
-      }
-      
-      const minPrice = parseFloat(searchParams.get('minPrice')) || 0;
-      const maxPrice = parseFloat(searchParams.get('maxPrice')) || 1000000;
-      filtered = filtered.filter(p => p.price >= minPrice && p.price <= maxPrice);
-      
-      const sort = searchParams.get('sort');
-      if (sort === 'price_asc') filtered.sort((a,b) => a.price - b.price);
-      else if (sort === 'price_desc') filtered.sort((a,b) => b.price - a.price);
-      else if (sort === 'name_asc') filtered.sort((a,b) => a.name.localeCompare(b.name));
-      else {
-        // Default sort (newest or featured)
-      }
-      
-      // Keep the complete filtered set for accurate counts, but mount only one
-      // page of cards so scrolling does not decode hundreds of images at once.
-      const pageSize = 24;
-      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-      const requestedPage = Number.parseInt(searchParams.get('page'), 10) || 1;
-      const currentPage = Math.min(totalPages, Math.max(1, requestedPage));
-      setProducts(filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize));
-      setPagination({ totalProducts: filtered.length, totalPages, currentPage });
+      const response = await axios.get(`${API_URL}/products`, { params: { ...params, limit: 24 } });
+      setProducts(response.data?.products || []);
+      setPagination(response.data?.pagination || {});
     } catch (error) {
       console.error('Product load failure:', error);
       setLoadError(true);
@@ -100,7 +34,7 @@ const Products = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchParams, category, search]);
+  }, [searchParams]);
 
   const fetchFilterOptions = useCallback(async () => {
     try {
@@ -113,8 +47,11 @@ const Products = () => {
 
   useEffect(() => {
     fetchProducts();
+  }, [fetchProducts]);
+
+  useEffect(() => {
     fetchFilterOptions();
-  }, [fetchProducts, fetchFilterOptions]);
+  }, [fetchFilterOptions]);
 
   const handleFilterChange = (key, value) => {
     const newParams = new URLSearchParams(searchParams);
