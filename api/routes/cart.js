@@ -21,7 +21,12 @@ const requireCartKey = (req, res, next) => {
   next();
 };
 
-router.use(optionalAuth, requireCartKey);
+router.use(optionalAuth, requireCartKey, (req, res, next) => {
+  if (!supabase) {
+    return res.status(503).json({ error: 'Cart is temporarily unavailable' });
+  }
+  next();
+});
 
 // Get cart
 router.get('/', async (req, res) => {
@@ -317,8 +322,14 @@ router.delete('/clear', async (req, res) => {
       if (memoryCarts[cartKey]) memoryCarts[cartKey].items = [];
       return res.json({ message: 'Memory cart cleared' });
     }
-    const { data: cart } = await supabase.from('carts').select('id').eq('session_id', cartKey).single();
-    if (cart) await supabase.from('cart_items').delete().eq('cart_id', cart.id);
+    const { data: cart, error: cartError } = await supabase.from('carts')
+      .select('id').eq('session_id', cartKey).maybeSingle();
+    if (cartError) throw cartError;
+    if (cart) {
+      const { error: deleteError } = await supabase.from('cart_items')
+        .delete().eq('cart_id', cart.id);
+      if (deleteError) throw deleteError;
+    }
     res.json({ message: 'Cart cleared' });
   } catch (error) {
     res.status(500).json({ error: error.message });
