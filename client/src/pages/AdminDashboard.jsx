@@ -4,6 +4,25 @@ import axios from 'axios';
 import './Admin.css';
 import '../components/ProductCard.css';
 
+const ImageAuditPreview = ({ src }) => {
+    const [result, setResult] = useState(src ? 'Checking image…' : 'No image URL');
+
+    if (!src) return <span>No image URL</span>;
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', minWidth: 180 }}>
+            <img src={src} alt="" loading="lazy" decoding="async"
+                style={{ width: 48, height: 64, objectFit: 'contain', flexShrink: 0 }}
+                onLoad={event => {
+                    const { naturalWidth, naturalHeight } = event.currentTarget;
+                    setResult(`${naturalWidth} × ${naturalHeight} px${Math.min(naturalWidth, naturalHeight) < 500 ? ' · small source' : ''}`);
+                }}
+                onError={() => setResult('Image failed to load')} />
+            <span aria-live="polite">{result}</span>
+        </div>
+    );
+};
+
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -16,6 +35,7 @@ const AdminDashboard = () => {
     const [products, setProducts] = useState([]);
     const [supplierSearch, setSupplierSearch] = useState('');
     const [imageSourceFilter, setImageSourceFilter] = useState('all');
+    const [supplierPage, setSupplierPage] = useState(1);
     const [catalogLoadError, setCatalogLoadError] = useState(false);
     const [isEditing, setIsEditing] = useState(null);
     const [editForm, setEditForm] = useState({});
@@ -194,6 +214,19 @@ const AdminDashboard = () => {
             return 'Invalid URL';
         }
     };
+
+    const supplierMatches = products.filter(product => {
+        const source = getImageSource(product.image_url);
+        const matchesSource = imageSourceFilter === 'all' ||
+            (imageSourceFilter === 'external' && source !== 'Missing' && source !== 'Fuji Card / local') ||
+            (imageSourceFilter === 'local' && source === 'Fuji Card / local') ||
+            (imageSourceFilter === 'missing' && source === 'Missing');
+        const term = supplierSearch.trim().toLowerCase();
+        return matchesSource && (!term || [product.name, product.id, product.set_name, product.language, source]
+            .some(value => String(value || '').toLowerCase().includes(term)));
+    });
+    const supplierTotalPages = Math.max(1, Math.ceil(supplierMatches.length / 40));
+    const currentSupplierPage = Math.min(supplierPage, supplierTotalPages);
 
     const fetchCategories = async () => {
         try {
@@ -968,9 +1001,9 @@ const AdminDashboard = () => {
                                     <button className="admin-btn-primary" onClick={exportSupplierReview} disabled={!products.length}>Download supplier review CSV</button>
                                     <button className="admin-btn-secondary" onClick={() => { setActiveTab('products'); handleEditClick({}); }}>Add a confirmed product</button>
                                     <input aria-label="Search supplier review products" placeholder="Search name, set or ID"
-                                        value={supplierSearch} onChange={event => setSupplierSearch(event.target.value)}
+                                        value={supplierSearch} onChange={event => { setSupplierSearch(event.target.value); setSupplierPage(1); }}
                                         style={{ padding: '.65rem', minWidth: '220px', flex: 1 }} />
-                                    <select aria-label="Filter image source" value={imageSourceFilter} onChange={event => setImageSourceFilter(event.target.value)} style={{ padding: '.65rem', minWidth: '190px' }}>
+                                    <select aria-label="Filter image source" value={imageSourceFilter} onChange={event => { setImageSourceFilter(event.target.value); setSupplierPage(1); }} style={{ padding: '.65rem', minWidth: '190px' }}>
                                         <option value="all">All image sources</option>
                                         <option value="external">External images</option>
                                         <option value="local">Fuji Card / local</option>
@@ -980,19 +1013,11 @@ const AdminDashboard = () => {
                                 <p>The CSV includes each current image URL and source. Supplier SKU, confirmed quantity, cost, lead time, image permission and quote reference remain blank for the supplier to complete. New products start at zero stock until you enter a confirmed quantity.</p>
                                 <div style={{ overflowX: 'auto' }}>
                                     <table className="admin-table" style={{ width: '100%' }}>
-                                        <thead><tr><th>Image</th><th>Product</th><th>Image source</th><th>Set / language</th><th>Recorded stock</th><th>Listed price</th><th>Action</th></tr></thead>
+                                        <thead><tr><th>Image check</th><th>Product</th><th>Image source</th><th>Set / language</th><th>Recorded stock</th><th>Listed price</th><th>Action</th></tr></thead>
                                         <tbody>
-                                            {products.filter(p => {
-                                                const term = supplierSearch.trim().toLowerCase();
-                                                const source = getImageSource(p.image_url);
-                                                const matchesSource = imageSourceFilter === 'all' ||
-                                                    (imageSourceFilter === 'external' && source !== 'Missing' && source !== 'Fuji Card / local') ||
-                                                    (imageSourceFilter === 'local' && source === 'Fuji Card / local') ||
-                                                    (imageSourceFilter === 'missing' && source === 'Missing');
-                                                return matchesSource && (!term || [p.name, p.id, p.set_name, p.language, source].some(value => String(value || '').toLowerCase().includes(term)));
-                                            }).slice(0, 40).map(product => (
+                                            {supplierMatches.slice((currentSupplierPage - 1) * 40, currentSupplierPage * 40).map(product => (
                                                 <tr key={product.id}>
-                                                    <td>{product.image_url ? <img src={product.image_url} alt="" loading="lazy" style={{ width: 48, height: 64, objectFit: 'contain' }} /> : '—'}</td>
+                                                    <td><ImageAuditPreview key={product.image_url || 'missing'} src={product.image_url} /></td>
                                                     <td>{product.name}</td>
                                                     <td>{getImageSource(product.image_url)}</td>
                                                     <td>{product.set_name || '—'} / {product.language || '—'}</td>
@@ -1004,7 +1029,14 @@ const AdminDashboard = () => {
                                         </tbody>
                                     </table>
                                 </div>
-                                <p>Showing up to 40 matches. The CSV includes the full catalog.</p>
+                                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '1rem' }}>
+                                    <span>{supplierMatches.length} matches · Page {currentSupplierPage} of {supplierTotalPages}</span>
+                                    <button type="button" className="admin-btn-secondary" disabled={currentSupplierPage === 1}
+                                        onClick={() => setSupplierPage(page => Math.max(1, page - 1))}>Previous</button>
+                                    <button type="button" className="admin-btn-secondary" disabled={currentSupplierPage === supplierTotalPages}
+                                        onClick={() => setSupplierPage(page => Math.min(supplierTotalPages, page + 1))}>Next</button>
+                                </div>
+                                <p>Image checks run as thumbnails load in this browser. A small source may look soft when enlarged. The CSV includes the full catalog.</p>
                             </>
                         )}
                     </section>
