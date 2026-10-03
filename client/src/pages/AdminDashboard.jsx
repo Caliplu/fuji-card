@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Admin.css';
@@ -56,6 +56,7 @@ const AdminDashboard = () => {
     // Low Stock restock input amounts keyed by product id
     const [lowStockAmounts, setLowStockAmounts] = useState({});
     const [bulkAllLowStock, setBulkAllLowStock] = useState('');
+    const [visibleLowStock, setVisibleLowStock] = useState(20);
 
     // Search filtering state
     const [searchTerm, setSearchTerm] = useState('');
@@ -75,6 +76,9 @@ const AdminDashboard = () => {
     const fileInputRef = useRef(null);
 
     const API_URL = import.meta.env.VITE_API_URL || '/api';
+    const lowStockProducts = useMemo(() => products
+        .filter(product => Number(product.stock) < 10)
+        .sort((a, b) => Number(a.stock) - Number(b.stock)), [products]);
 
     // Run strictly once on mount to fetch broad data
     useEffect(() => {
@@ -450,11 +454,10 @@ const AdminDashboard = () => {
         const amount = parseInt(bulkAllLowStock, 10);
         if (!amount || amount <= 0) return alert('Enter a valid quantity to add.');
 
-        const lowStockIds = products
-            .filter(p => Number(p.stock) < 10)
-            .map(p => p.id);
+        const lowStockIds = lowStockProducts.map(p => p.id);
 
         if (lowStockIds.length === 0) return alert('No low stock products found.');
+        if (!window.confirm(`Add ${amount} units to each of ${lowStockIds.length} products? Confirm the received quantities before updating recorded stock.`)) return;
 
         const token = localStorage.getItem('adminToken');
         try {
@@ -670,8 +673,8 @@ const AdminDashboard = () => {
                                 <div className="stat-value">{stats.users} Active</div>
                             </div>
                             <div className="stat-card glass-panel">
-                                <h3>Total Inventory (Cards)</h3>
-                                <div className="stat-value">{stats.products} Units</div>
+                                <h3>Catalog Products</h3>
+                                <div className="stat-value">{stats.products} Listings</div>
                             </div>
                             <div className="stat-card glass-panel">
                                 <h3>Total Orders Processed</h3>
@@ -680,12 +683,12 @@ const AdminDashboard = () => {
                         </div>
 
                         {/* Low Stock Alert Panel */}
-                        {products.filter(p => Number(p.stock) < 10).length > 0 && (
+                        {lowStockProducts.length > 0 && (
                             <div className="glass-panel" style={{ marginTop: '2rem', padding: '1.5rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
                                     <span style={{ fontSize: '1.5rem' }}>⚠️</span>
                                     <h3 style={{ margin: 0, color: '#f59e0b' }}>
-                                        Low Stock Alert — {products.filter(p => Number(p.stock) < 10).length} card(s) running low
+                                        Recorded low stock — {lowStockProducts.length} card(s)
                                     </h3>
                                     <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                         <input
@@ -713,9 +716,8 @@ const AdminDashboard = () => {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                    {products
-                                        .filter(p => Number(p.stock) < 10)
-                                        .sort((a, b) => Number(a.stock) - Number(b.stock))
+                                    {lowStockProducts
+                                        .slice(0, visibleLowStock)
                                         .map(product => (
                                             <div key={product.id} style={{
                                                 display: 'flex', alignItems: 'center', gap: '1rem',
@@ -723,7 +725,7 @@ const AdminDashboard = () => {
                                                 padding: '0.75rem 1rem', flexWrap: 'wrap'
                                             }}>
                                                 {product.image_url && (
-                                                    <img src={product.image_url} alt={product.name}
+                                                    <img src={product.image_url} alt="" loading="lazy" decoding="async"
                                                         style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />
                                                 )}
                                                 <div style={{ flex: 1, minWidth: '160px' }}>
@@ -762,6 +764,12 @@ const AdminDashboard = () => {
                                                 </div>
                                             </div>
                                         ))}
+                                    {lowStockProducts.length > 20 && (
+                                        <button type="button" className="admin-btn-secondary" style={{ alignSelf: 'flex-start', marginTop: '0.5rem' }}
+                                            onClick={() => setVisibleLowStock(count => count >= lowStockProducts.length ? 20 : Math.min(count + 20, lowStockProducts.length))}>
+                                            {visibleLowStock >= lowStockProducts.length ? 'Show fewer' : `Show 20 more (${Math.min(visibleLowStock, lowStockProducts.length)} of ${lowStockProducts.length})`}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -769,31 +777,14 @@ const AdminDashboard = () => {
                         <div className="admin-recent-activity glass-panel" style={{ marginTop: '2rem' }}>
                             <h3>Administrative Operations</h3>
                             <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                                Sync your local flagship inventory (100+ items) to the Supabase cloud ledger to enable live database management.
+                                Review supplier quantities and approved image sources before adding new listings or changing recorded stock.
                             </p>
-                            <button
-                                className="admin-btn-primary"
-                                style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}
-                                onClick={async () => {
-                                    if (!window.confirm("Initialize mass synchronization to Supabase? This will populate your cloud database with all local flagship items.")) return;
-                                    try {
-                                        const token = localStorage.getItem('adminToken');
-                                        const API_URL = import.meta.env.VITE_API_URL || '/api';
-                                        const { data } = await axios.post(`${API_URL}/admin/sync-flagship`, {}, {
-                                            headers: { Authorization: `Bearer ${token}` }
-                                        });
-                                        alert(data.message || "Sync successful!");
-                                        window.location.reload();
-                                    } catch (err) {
-                                        alert("Sync failed: " + (err.response?.data?.error || err.message));
-                                    }
-                                }}
-                            >
-                                ⚡ Synchronize Cloud Ledger
+                            <button className="admin-btn-primary" onClick={() => setActiveTab('supplier')}>
+                                Open Supplier Review
                             </button>
                             <ul className="log-list" style={{ marginTop: '1.5rem' }}>
                                 <li>[Sys] Admin dashboard established contact w/ system.</li>
-                                <li>[Intel] Currently monitoring local flagship assets.</li>
+                                <li>[Catalog] Recorded quantities need supplier confirmation.</li>
                                 {stats.fallbackMode && <li style={{ color: '#f59e0b' }}>[Warning] Running in Legacy Fallback mode (Supabase disconnected).</li>}
                             </ul>
                         </div>
