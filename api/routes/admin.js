@@ -87,8 +87,10 @@ const updateSetting = async (key, value) => {
                 { onConflict: 'key' }
             );
         if (error) throw error;
+        return true;
     } catch (e) {
         console.error(`Failed to update setting ${key}`, e);
+        return false;
     }
 };
 // --- END SETTINGS MIGRATION ---
@@ -600,7 +602,9 @@ router.put('/crypto-wallets/:symbol', authenticateAdmin, async (req, res) => {
     const wallets = await getSetting('wallets', {});
     if (!wallets[symbol]) return res.status(404).json({ error: 'Unknown coin symbol' });
     wallets[symbol] = { ...wallets[symbol], address, trustLink };
-    await updateSetting('wallets', wallets);
+    if (!(await updateSetting('wallets', wallets))) {
+        return res.status(503).json({ error: 'Wallet settings could not be saved' });
+    }
     res.json({ message: `${symbol} wallet updated`, config: wallets[symbol] });
 });
 
@@ -620,7 +624,9 @@ router.get('/paystack-config', authenticateAdmin, async (req, res) => {
 router.put('/paystack-config', authenticateAdmin, async (req, res) => {
     const { publicKey, secretKey } = req.body;
     const paystack = { publicKey, secretKey };
-    await updateSetting('paystack', paystack);
+    if (!(await updateSetting('paystack', paystack))) {
+        return res.status(503).json({ error: 'Paystack settings could not be saved' });
+    }
     res.json({ message: 'Paystack settings updated', config: paystack });
 });
 
@@ -634,7 +640,9 @@ router.get('/payfast-config', authenticateAdmin, async (req, res) => {
 router.put('/payfast-config', authenticateAdmin, async (req, res) => {
     const { merchantId, merchantKey, passphrase, url } = req.body;
     const payfast = { merchantId, merchantKey, passphrase, url };
-    await updateSetting('payfast', payfast);
+    if (!(await updateSetting('payfast', payfast))) {
+        return res.status(503).json({ error: 'PayFast settings could not be saved' });
+    }
     res.json({ message: 'PayFast settings updated', config: payfast });
 });
 
