@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -7,20 +7,20 @@ import Header from './components/Header';
 import AuthHeader from './components/AuthHeader';
 import Footer from './components/Footer';
 import Home from './pages/Home';
-import Products from './pages/Products';
-import ProductDetail from './pages/ProductDetail';
-import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Account from './pages/Account';
-import OrderConfirmation from './pages/OrderConfirmation';
-import PaymentMethodsPage from './pages/PaymentMethods';
-import Info from './pages/Info';
-import AdminAuth from './pages/AdminAuth';
-import AdminDashboard from './pages/AdminDashboard';
-import Contact from './pages/Contact';
 import './App.css';
+const Products = lazy(() => import('./pages/Products'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Account = lazy(() => import('./pages/Account'));
+const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'));
+const PaymentMethodsPage = lazy(() => import('./pages/PaymentMethods'));
+const Info = lazy(() => import('./pages/Info'));
+const AdminAuth = lazy(() => import('./pages/AdminAuth'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const Contact = lazy(() => import('./pages/Contact'));
 
 // Component to conditionally render header and footer
 const AppContent = () => {
@@ -41,7 +41,8 @@ const AppContent = () => {
     <div className={`app ${isAdminPage ? 'admin-app' : ''}`}>
       {!isAdminPage && (isAuthPage ? <AuthHeader /> : <Header />)}
       <main className={`main-content ${isAuthPage ? 'auth-main-content' : ''} ${isAdminPage ? 'admin-main-content' : ''}`}>
-        <Routes>
+        <Suspense fallback={<div className="route-loading" role="status">Loading page...</div>}>
+          <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetail />} />
@@ -56,7 +57,8 @@ const AppContent = () => {
           <Route path="/info" element={<Info />} />
           <Route path="/secret-fuji-admin" element={<AdminAuth />} />
           <Route path="/secret-fuji-admin/dashboard" element={<AdminDashboard />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </main>
 
       {showFooter && !isAdminPage && <Footer />}

@@ -509,3 +509,14 @@
     line-clamp: 2;
   }
 }
+
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .product-card, .product-image img, .product-card::before, .product-image::after {
+    animation: none;
+    transition: none;
+  }
+  .product-card:hover, .product-card:hover .product-image img {
+    transform: none;
+  }
+  .product-image::after { display: none; }
+}

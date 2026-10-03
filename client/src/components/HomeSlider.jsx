@@ -1,95 +1,67 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import './HomeSlider.css';
+
+const slides = [
+  {
+    image: '/M4-bb-750x750.webp',
+    eyebrow: 'Pokémon TCG',
+    title: 'Ninja Spinner',
+    description: 'Explore Japanese Pokémon cards and sealed products.',
+    link: '/products?search=ninja',
+    label: 'Explore Pokémon'
+  },
+  {
+    image: '/M2a-bb-750x750.webp',
+    eyebrow: 'Pokémon TCG',
+    title: 'Mega Dream ex',
+    description: 'Find standout cards and boxes for your collection.',
+    link: '/products?search=mega',
+    label: 'Browse the collection'
+  },
+  {
+    image: '/OP-15-bb-750x750.webp.webp',
+    eyebrow: 'One Piece Card Game',
+    title: 'One Piece',
+    description: 'Explore cards and sealed products from the One Piece collection.',
+    link: '/products?category=onepiece',
+    label: 'Explore One Piece'
+  }
+];
 
 const HomeSlider = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
-
-  const slides = [
-    {
-      id: 1,
-      image: '/slideshow/M4-back-300x167.webp',
-      title: 'Explore the Collection',
-      subtitle: 'M4 Ninja Spinner',
-      info: 'Browse Japanese trading cards',
-      buttonText: 'VIEW PRODUCTS',
-      link: '/products?search=ninja'
-    },
-    {
-      id: 2,
-      image: '/slideshow/M2a-back-300x186.jpg',
-      title: 'Now Available!!',
-      subtitle: 'M2a MEGA Dream ex',
-      info: 'Discover the latest Mega series!',
-      buttonText: 'ORDER NOW!',
-      link: '/products?search=mega'
-    },
-    {
-      id: 3,
-      image: '/slideshow/M3-back-300x167.webp',
-      title: 'Coming Soon!!',
-      subtitle: 'M3 Series Upgrade',
-      info: 'Official Series Arrival',
-      buttonText: 'VIEW MORE',
-      link: '/products?search=m3'
-    },
-    {
-      id: 4,
-      image: '/slideshow/OP-15-back-300x176.webp',
-      title: 'One Piece Card List!!',
-      subtitle: 'OP-15 Set Discovery',
-      info: 'All latest One Piece cards available',
-      buttonText: 'EXPLORE',
-      link: '/products?search=op-15'
-    },
-    {
-      id: 5,
-      image: '/slideshow/EB-04-back-300x171.webp',
-      title: 'Premium Selection!!',
-      subtitle: 'EB-04 Series',
-      info: 'Sealed Official Japanese Products',
-      buttonText: 'SHOP NOW',
-      link: '/products?search=eb-04'
-    }
-  ];
+  const slide = slides[currentSlide];
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [slides.length]);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const timer = window.setInterval(() => {
+      if (!document.hidden) setCurrentSlide(previous => (previous + 1) % slides.length);
+    }, 6500);
+    return () => window.clearInterval(timer);
+  }, []);
 
   return (
-    <div className="home-slider">
-      {slides.map((slide, index) => (
-        <div 
-          key={slide.id} 
-          className={`slide ${index === currentSlide ? 'active' : ''}`}
-          style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${slide.image})` }}
-        >
-          <div className="slide-content">
-            <div className="glass-box">
-              <p className="pre-order-tag">{slide.title}</p>
-              <h2 className="slide-main-title">{slide.subtitle}</h2>
-              <p className="release-info">{slide.info}</p>
-              <a href={slide.link} className="order-btn-mockup">
-                {slide.buttonText}
-              </a>
-            </div>
-          </div>
-        </div>
-      ))}
-      
-      <div className="slider-dots">
-        {slides.map((_, i) => (
-          <div 
-            key={i} 
-            className={`dot ${i === currentSlide ? 'active' : ''}`}
-            onClick={() => setCurrentSlide(i)}
-          ></div>
+    <section className="fuji-hero" aria-label="Featured collections">
+      <div className="fuji-hero-copy">
+        <span className="fuji-hero-eyebrow">{slide.eyebrow}</span>
+        <h1>{slide.title}</h1>
+        <p>{slide.description}</p>
+        <Link className="fuji-hero-link" to={slide.link}>{slide.label}<span aria-hidden="true"> →</span></Link>
+      </div>
+      <div className="fuji-hero-art">
+        <img key={slide.image} src={slide.image} alt={slide.title + ' trading card product'}
+          width="750" height="750" decoding="async" fetchPriority={currentSlide === 0 ? 'high' : 'auto'} />
+      </div>
+      <div className="fuji-hero-dots" aria-label="Choose featured collection">
+        {slides.map((item, index) => (
+          <button key={item.title} type="button"
+            aria-label={'Show ' + item.title}
+            aria-current={index === currentSlide ? 'true' : undefined}
+            onClick={() => setCurrentSlide(index)} />
         ))}
       </div>
-    </div>
+    </section>
   );
 };
 

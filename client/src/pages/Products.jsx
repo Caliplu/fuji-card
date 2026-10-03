@@ -24,7 +24,7 @@ const Products = () => {
       setLoading(true);
       setLoadError(false);
       const params = Object.fromEntries(searchParams.entries());
-      const response = await axios.get(`${API_URL}/products`, { params: { ...params, limit: 1000 } });
+      const response = await axios.get(`${API_URL}/products`, { params: { ...params, page: 1, limit: 1000 } });
       
       // Manual Filtering across everything
       let filtered = response.data?.products || [];
@@ -85,12 +85,14 @@ const Products = () => {
         // Default sort (newest or featured)
       }
       
-      setProducts(filtered);
-      setPagination({
-        totalProducts: filtered.length,
-        totalPages: 1,
-        currentPage: 1
-      });
+      // Keep the complete filtered set for accurate counts, but mount only one
+      // page of cards so scrolling does not decode hundreds of images at once.
+      const pageSize = 24;
+      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+      const requestedPage = Number.parseInt(searchParams.get('page'), 10) || 1;
+      const currentPage = Math.min(totalPages, Math.max(1, requestedPage));
+      setProducts(filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize));
+      setPagination({ totalProducts: filtered.length, totalPages, currentPage });
     } catch (error) {
       console.error('Product load failure:', error);
       setLoadError(true);
@@ -134,6 +136,13 @@ const Products = () => {
 
   const clearFilters = () => {
     setSearchParams({});
+  };
+
+  const changePage = (page) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', String(page));
+    setSearchParams(newParams);
+    document.querySelector('.products-header')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const getCategoryTitle = () => {
@@ -217,9 +226,20 @@ const Products = () => {
                 <button onClick={clearFilters} className="btn btn-primary">Reset Filters</button>
               </div>
             ) : (
-              <div className="products-grid">
-                {products.map(product => <ProductCard key={product.id} product={product} />)}
-              </div>
+              <>
+                <div className="products-grid">
+                  {products.map(product => <ProductCard key={product.id} product={product} />)}
+                </div>
+                {pagination.totalPages > 1 && (
+                  <nav className="catalog-pagination" aria-label="Product pages">
+                    <button type="button" disabled={pagination.currentPage === 1}
+                      onClick={() => changePage(pagination.currentPage - 1)}>Previous</button>
+                    <span>Page {pagination.currentPage} of {pagination.totalPages}</span>
+                    <button type="button" disabled={pagination.currentPage === pagination.totalPages}
+                      onClick={() => changePage(pagination.currentPage + 1)}>Next</button>
+                  </nav>
+                )}
+              </>
             )}
           </main>
         </div>
