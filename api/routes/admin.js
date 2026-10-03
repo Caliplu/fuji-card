@@ -10,7 +10,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import { localProductStore } from '../data/flagship_products.js';
-import { products as bundledCatalog } from '../data/store.js';
 
 const router = express.Router();
 
@@ -221,49 +220,6 @@ router.get('/debug-env', (req, res) => {
         has_url: !!process.env.SUPABASE_URL,
         has_server_key: !!(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
     });
-});
-
-// Sync local products to Supabase
-router.post('/sync-flagship', async (req, res) => {
-    try {
-        if (!supabase) return res.status(503).json({ error: 'Database unavailable' });
-        const { data: catData, error: catError } = await supabase.from('categories').select('id, name');
-        if (catError) throw catError;
-        const catMap = new Map(catData.map(c => [c.name, c.id]));
-
-        // Never overwrite current stock, edited prices, images or order-linked IDs.
-        const productsToInsert = bundledCatalog.map(p => ({
-                id: p.id,
-                name: p.name,
-                description: p.description || '',
-                price: p.price,
-                image_url: p.image,
-                category_id: catMap.get(p.category) || null,
-                card_type: p.cardType || null,
-                set_name: p.set || null,
-                rarity: p.rarity || null,
-                condition: p.condition || null,
-                language: p.language || null,
-                stock: p.stock,
-                featured: Boolean(p.featured)
-            }));
-
-        for (let offset = 0; offset < productsToInsert.length; offset += 100) {
-            const { error } = await supabase.from('products')
-                .upsert(productsToInsert.slice(offset, offset + 100), {
-                    onConflict: 'id', ignoreDuplicates: true
-                });
-            if (error) throw error;
-        }
-
-        res.json({
-            message: 'Bundled catalog checked. Existing products and stock were not changed.',
-            count: productsToInsert.length
-        });
-    } catch (error) {
-        console.error('Sync error:', error);
-        res.status(500).json({ error: 'Sync failed: ' + (error.message || JSON.stringify(error)) });
-    }
 });
 
 // Add a new product
