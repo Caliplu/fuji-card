@@ -11,11 +11,14 @@ export const CartProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const { isAuthenticated } = useAuth();
 
-  // Keep the last server cart for display while a fresh request loads.
+  // Show the last server-confirmed cart while the current one loads.
   const getLocalCart = useCallback(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('fuji_local_cart') || 'null');
-      return saved && Array.isArray(saved.items) ? saved : { items: [], itemCount: 0, subtotal: '0.00' };
+      if (!Array.isArray(saved?.items)) throw new Error('Invalid stored cart');
+      const items = saved.items.filter(item => !String(item.id).startsWith('local_'));
+      const subtotal = items.reduce((sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 0), 0);
+      return { ...saved, items, itemCount: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0), subtotal: subtotal.toFixed(2) };
     } catch {
       return { items: [], itemCount: 0, subtotal: '0.00' };
     }
@@ -41,7 +44,7 @@ export const CartProvider = ({ children }) => {
       setCart(response.data);
       saveLocalCart(response.data); // Keep local sync'd with server
     } catch (error) {
-      console.warn('Could not refresh cart; showing last saved server cart:', error);
+      console.warn('API Cart failed, using local fallback:', error);
       setCart(getLocalCart());
     } finally {
       setLoading(false);
@@ -53,36 +56,50 @@ export const CartProvider = ({ children }) => {
   }, [fetchCart, isAuthenticated]);
 
   const addToCart = async (productId, quantity = 1) => {
-    await cartAPI.add(productId, quantity);
-    await fetchCart();
-    return true;
+    try {
+      await cartAPI.add(productId, quantity);
+      await fetchCart();
+      return true;
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      throw error;
+    }
   };
 
   const updateQuantity = async (itemId, quantity) => {
-    setLoading(true);
     try {
+      setLoading(true);
       await cartAPI.update(itemId, quantity);
       await fetchCart();
+    } catch (error) {
+      console.error('Failed to update cart:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
   const removeFromCart = async (itemId) => {
-    setLoading(true);
     try {
+      setLoading(true);
       await cartAPI.remove(itemId);
       await fetchCart();
+    } catch (error) {
+      console.error('Failed to remove from cart:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
   const clearCart = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       await cartAPI.clear();
       await fetchCart();
+    } catch (error) {
+      console.error('Failed to clear cart:', error);
+      throw error;
     } finally {
       setLoading(false);
     }

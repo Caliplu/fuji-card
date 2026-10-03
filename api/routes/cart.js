@@ -1,12 +1,8 @@
 import express from 'express';
 import { supabase } from '../config/supabase.js';
-import { authenticateToken, optionalAuth } from '../middleware/auth.js';
-import { products as fallbackProducts } from '../data/store.js';
+import { optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
-
-// Mock In-Memory Cart for Fallback when Supabase is unconfigured
-const memoryCarts = {};
 
 // Helper to get cart key (user id or session id)
 const getCartKey = (req) => {
@@ -32,33 +28,6 @@ router.use(optionalAuth, requireCartKey, (req, res, next) => {
 router.get('/', async (req, res) => {
   try {
     const cartKey = getCartKey(req);
-
-    // IF SUPABASE IS NOT AVAILABLE, USE MEMORY CART
-    if (!supabase) {
-      console.log('⚠️  Using memory cart (Supabase not configured)');
-      if (!memoryCarts[cartKey]) {
-        memoryCarts[cartKey] = { items: [] };
-      }
-      
-      const cart = memoryCarts[cartKey];
-      const populatedItems = cart.items.map(item => {
-        const product = fallbackProducts.find(p => p.id === item.product_id);
-        return {
-          id: item.id,
-          productId: item.product_id,
-          quantity: item.quantity,
-          product: product || { id: item.product_id, name: 'Unknown Product', price: 0 }
-        };
-      });
-
-      const subtotal = populatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-      
-      return res.json({
-        items: populatedItems,
-        itemCount: populatedItems.reduce((sum, item) => sum + item.quantity, 0),
-        subtotal: subtotal.toFixed(2)
-      });
-    }
 
     // Get or create cart for this user/session
     let { data: cart, error: cartError } = await supabase
@@ -138,35 +107,10 @@ router.post('/add', async (req, res) => {
       return res.status(400).json({ error: 'Quantity must be a positive integer' });
     }
 
-    // FALLBACK IF NO SUPABASE
-    if (!supabase) {
-      console.log('⚠️  Adding to memory cart (Supabase not configured)');
-      const product = fallbackProducts.find(p => p.id === productId);
-      if (!product) return res.status(404).json({ error: 'Product not found in store' });
-
-      if (!memoryCarts[cartKey]) memoryCarts[cartKey] = { items: [] };
-      const cart = memoryCarts[cartKey];
-
-      const existingItem = cart.items.find(item => item.product_id === productId);
-      if (quantity + (existingItem?.quantity || 0) > Number(product.stock)) {
-        return res.status(409).json({ error: 'Not enough stock available' });
-      }
-      if (existingItem) {
-        existingItem.quantity += quantity;
-      } else {
-        cart.items.push({
-          id: `mem_${Date.now()}_${Math.random()}`,
-          product_id: productId,
-          quantity: quantity
-        });
-      }
-      return res.json({ success: true, message: 'Added to memory cart' });
-    }
-
     // Parallelize product stock check and cart lookup
     const [productRes, cartRes] = await Promise.all([
       supabase.from('products').select('id, stock, price').eq('id', productId).single(),
-      supabase.from('carts').select('*').eq('session_id', cartKey).maybeSingle()
+      supabase.from('carts').select('*').eq('session_id', cartKey).single()
     ]);
 
     const { data: product, error: productError } = productRes;
@@ -180,8 +124,7 @@ router.post('/add', async (req, res) => {
       return res.status(400).json({ error: 'Not enough stock available' });
     }
 
-    if (cartError) throw cartError;
-    if (!cart) {
+    if (cartError || !cart) {
       const { data: newCart, error: insertError } = await supabase
         .from('carts')
         .insert({ session_id: cartKey })
@@ -192,34 +135,32 @@ router.post('/add', async (req, res) => {
     }
 
     // Check if item already in cart
-    const { data: existingItem, error: existingError } = await supabase
+    const { data: existingItem } = await supabase
       .from('cart_items')
-      .select('id, quantity')
+      .select('*')
       .eq('cart_id', cart.id)
       .eq('product_id', productId)
-      .maybeSingle();
-    if (existingError) throw existingError;
-
-    const newQuantity = (existingItem?.quantity || 0) + quantity;
-    if (newQuantity > Number(product.stock)) {
-      return res.status(409).json({ error: 'Not enough stock available' });
-    }
+      .single();
 
     if (existingItem) {
-      const { error } = await supabase
+      const newQuantity = existingItem.quantity + quantity;
+      if (newQuantity > product.stock) {
+        return res.status(400).json({ error: 'Not enough stock available' });
+      }
+      const { error: updateError } = await supabase
         .from('cart_items')
         .update({ quantity: newQuantity, updated_at: new Date().toISOString() })
         .eq('id', existingItem.id);
-      if (error) throw error;
+      if (updateError) throw updateError;
     } else {
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('cart_items')
         .insert({
           cart_id: cart.id,
           product_id: productId,
           quantity: quantity
         });
-      if (error) throw error;
+      if (insertError) throw insertError;
     }
 
     res.json({ success: true, message: 'Added to cart' });
@@ -237,19 +178,6 @@ router.put('/update/:itemId', async (req, res) => {
     const cartKey = getCartKey(req);
     if (!Number.isSafeInteger(quantity) || quantity < 0) {
       return res.status(400).json({ error: 'Quantity must be a non-negative integer' });
-    }
-
-    if (!supabase) {
-      if (!memoryCarts[cartKey]) return res.status(404).json({ error: 'Cart empty' });
-      const item = memoryCarts[cartKey].items.find(i => i.id === itemId);
-      if (!item) return res.status(404).json({ error: 'Item not found' });
-
-      if (quantity <= 0) {
-        memoryCarts[cartKey].items = memoryCarts[cartKey].items.filter(i => i.id !== itemId);
-      } else {
-        item.quantity = quantity;
-      }
-      return res.json({ message: 'Memory cart updated' });
     }
 
     // A cart item ID alone is not proof of ownership. Scope every mutation
@@ -293,13 +221,6 @@ router.delete('/remove/:itemId', async (req, res) => {
     const { itemId } = req.params;
     const cartKey = getCartKey(req);
 
-    if (!supabase) {
-      if (memoryCarts[cartKey]) {
-        memoryCarts[cartKey].items = memoryCarts[cartKey].items.filter(i => i.id !== itemId);
-      }
-      return res.json({ message: 'Removed from memory cart' });
-    }
-
     const { data: cart, error: cartError } = await supabase.from('carts')
       .select('id').eq('session_id', cartKey).maybeSingle();
     if (cartError) throw cartError;
@@ -318,10 +239,6 @@ router.delete('/remove/:itemId', async (req, res) => {
 router.delete('/clear', async (req, res) => {
   try {
     const cartKey = getCartKey(req);
-    if (!supabase) {
-      if (memoryCarts[cartKey]) memoryCarts[cartKey].items = [];
-      return res.json({ message: 'Memory cart cleared' });
-    }
     const { data: cart, error: cartError } = await supabase.from('carts')
       .select('id').eq('session_id', cartKey).maybeSingle();
     if (cartError) throw cartError;
