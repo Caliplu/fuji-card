@@ -400,8 +400,12 @@ const AdminDashboard = () => {
     };
 
     const handleImageUpload = (file) => {
-        if (!file || !file.type.startsWith('image/')) {
-            alert('Please drop a valid image file');
+        if (!file || !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+            alert('Choose a JPEG, PNG, WebP or GIF image.');
+            return;
+        }
+        if (file.size > 8 * 1024 * 1024) {
+            alert('Choose an image smaller than 8 MB.');
             return;
         }
 
@@ -906,20 +910,20 @@ const AdminDashboard = () => {
                                             type="file"
                                             ref={fileInputRef}
                                             style={{ display: 'none' }}
-                                            accept="image/*"
+                                            accept="image/jpeg,image/png,image/webp,image/gif"
                                             onChange={handleFileInputChange}
                                         />
                                         <div className="dropzone-placeholder">
                                             <div className="upload-icon">📸</div>
                                             <p>{editForm.image_url ? 'Asset imported. Drag or click here to replace.' : 'Drag & Drop an image here or click to browse'}</p>
-                                            <p className="small-text">or paste an image URL below</p>
+                                            <p className="small-text">JPEG, PNG, WebP or GIF up to 8 MB · or paste an image URL below</p>
                                         </div>
                                     </div>
                                     <input
                                         name="image_url"
-                                        value={editForm.image_url || ''}
+                                        value={editForm.image_url?.startsWith('data:') ? '' : (editForm.image_url || '')}
                                         onChange={handleFormChange}
-                                        placeholder="https://... or base64 format..."
+                                        placeholder={editForm.image_url?.startsWith('data:') ? 'Photo selected; upload on Save' : 'https://...'}
                                         style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
                                     />
                                 </div>
