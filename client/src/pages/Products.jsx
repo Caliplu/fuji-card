@@ -11,7 +11,6 @@ const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [pagination, setPagination] = useState({});
-  const [filterOptions, setFilterOptions] = useState({});
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -36,22 +35,9 @@ const Products = () => {
     }
   }, [searchParams]);
 
-  const fetchFilterOptions = useCallback(async () => {
-    try {
-      const response = await axios.get(`${API_URL}/products/filters/options`, { params: { category } });
-      setFilterOptions(response.data);
-    } catch (error) {
-      setFilterOptions({ rarities: [], conditions: [], languages: [], sets: [] });
-    }
-  }, [category]);
-
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
-
-  useEffect(() => {
-    fetchFilterOptions();
-  }, [fetchFilterOptions]);
 
   const handleFilterChange = (key, value) => {
     const newParams = new URLSearchParams(searchParams);
