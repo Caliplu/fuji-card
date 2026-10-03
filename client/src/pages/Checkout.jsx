@@ -146,6 +146,20 @@ const Checkout = () => {
     );
   }
 
+  if (cart.items.some(item => !item.product)) {
+    return (
+      <div className="checkout-page">
+        <div className="container">
+          <div className="empty-checkout">
+            <h2>An item is unavailable</h2>
+            <p>Remove unavailable products from your cart before requesting an order.</p>
+            <Link to="/cart" className="btn btn-primary">Review Cart</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const subtotal = parseFloat(cart.subtotal) || 0;
 
   const handleChange = (e) => {
