@@ -17,6 +17,7 @@ const PremiumProductCard = ({ product }) => {
       await addToCart(product.id, 1);
     } catch (error) {
       console.error('Failed to add to cart:', error);
+      alert(error.response?.data?.error || 'Could not add this product to your cart. Please try again.');
     } finally {
       setAdding(false);
     }
