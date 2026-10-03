@@ -29,7 +29,7 @@ const PremiumProductCard = ({ product }) => {
     <div className="premium-product-wrapper">
       <Link to={`/product/${product.id}`} className="premium-product-card">
         <div className="premium-image-container">
-          <img src={imageUrl || '/logo.png'} alt={product.name} className="premium-bg-image"
+          <img src={imageUrl || '/logo.png'} alt={product.name} className="premium-bg-image" loading="lazy" decoding="async" width="600" height="780"
             onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = '/logo.png'; }} />
           <div className="premium-overlay-gradient"></div>
           

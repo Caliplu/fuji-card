@@ -1,128 +1,112 @@
-.home-slider {
-  width: 100%;
-  height: 500px;
+.fuji-hero {
   position: relative;
-  overflow: hidden;
-  margin-top: 15px;
-  background-color: #000;
-}
-
-.slide {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-size: cover;
-  background-position: center;
-  opacity: 0;
-  transition: opacity 1s ease-in-out;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .9fr);
   align-items: center;
-  justify-content: center;
+  min-height: 430px;
+  margin-top: 15px;
+  overflow: hidden;
+  border-radius: 18px;
+  color: #fff;
+  background: radial-gradient(circle at 80% 20%, #3058ad 0, transparent 40%), linear-gradient(120deg, #101936, #162c62);
 }
 
-.slide.active {
-  opacity: 1;
+.fuji-hero-copy {
+  position: relative;
+  z-index: 1;
+  padding: 48px 0 64px clamp(28px, 6vw, 72px);
 }
 
-.slide-content {
-  width: 90%;
-  max-width: 800px;
-  text-align: center;
-}
-
-.glass-box {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 50px 40px;
-  border-radius: 4px;
-  color: white;
-}
-
-.pre-order-tag {
-  font-size: 24px;
-  margin: 0;
-  font-weight: 600;
-  letter-spacing: 1px;
-}
-
-.slide-main-title {
-  font-size: 64px;
-  margin: 15px 0;
-  font-weight: 900;
+.fuji-hero-eyebrow {
+  color: #a9c8ff;
+  font-size: .82rem;
+  font-weight: 800;
+  letter-spacing: .16em;
   text-transform: uppercase;
 }
 
-.release-info {
-  font-size: 18px;
-  margin-bottom: 30px;
-  opacity: 0.9;
+.fuji-hero h1 {
+  max-width: 10ch;
+  margin: 12px 0 14px;
+  font-size: clamp(2.5rem, 5vw, 4.6rem);
+  line-height: 1.04;
+  letter-spacing: -.04em;
 }
 
-.order-btn-mockup {
-  display: inline-block;
-  background: white;
-  color: #333;
-  padding: 16px 45px;
-  text-decoration: none;
+.fuji-hero p {
+  max-width: 34ch;
+  margin: 0 0 28px;
+  color: #e2eaff;
+  font-size: clamp(1rem, 1.5vw, 1.15rem);
+  line-height: 1.55;
+}
+
+.fuji-hero-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 10px 22px;
+  border-radius: 8px;
+  color: #102451;
+  background: #fff;
   font-weight: 800;
-  font-size: 18px;
-  border-radius: 4px;
-  transition: all 0.2s;
+  text-decoration: none;
 }
 
-.order-btn-mockup:hover {
-  background: #f0f0f0;
-  transform: scale(1.05);
+.fuji-hero-link:hover,
+.fuji-hero-link:focus-visible { background: #dbe9ff; }
+
+.fuji-hero-art {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 100%;
+  padding: 20px 46px 24px 10px;
 }
 
-.slider-dots {
+.fuji-hero-art img {
+  display: block;
+  width: min(100%, 390px);
+  height: auto;
+  max-height: 390px;
+  object-fit: contain;
+  filter: drop-shadow(0 22px 26px rgba(0, 0, 0, .28));
+}
+
+.fuji-hero-dots {
   position: absolute;
-  bottom: 25px;
-  left: 50%;
-  transform: translateX(-50%);
+  z-index: 2;
+  left: clamp(28px, 6vw, 72px);
+  bottom: 23px;
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
-.dot {
-  width: 45px;
-  height: 5px;
-  background: rgba(255, 255, 255, 0.3);
+.fuji-hero-dots button {
+  width: 32px;
+  height: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .4);
   cursor: pointer;
-  transition: background 0.3s;
 }
 
-.dot.active {
-  background: white;
+.fuji-hero-dots button[aria-current="true"] { background: #fff; }
+
+@media (max-width: 680px) {
+  .fuji-hero {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .fuji-hero-copy { padding: 30px 26px 4px; }
+  .fuji-hero h1 { max-width: none; font-size: clamp(2.2rem, 10vw, 3.3rem); }
+  .fuji-hero p { margin-bottom: 18px; }
+  .fuji-hero-art { height: 260px; padding: 0 24px 32px; }
+  .fuji-hero-art img { width: min(100%, 250px); max-height: 250px; }
+  .fuji-hero-dots { left: 26px; bottom: 17px; }
 }
 
-@media (max-width: 768px) {
-  .home-slider {
-    height: 380px;
-  }
-  
-  .glass-box {
-    padding: 30px 20px;
-  }
-  
-  .pre-order-tag {
-    font-size: 18px;
-  }
-  
-  .slide-main-title {
-    font-size: 32px;
-  }
-  
-  .release-info {
-    font-size: 14px;
-  }
-  
-  .order-btn-mockup {
-    padding: 12px 30px;
-    font-size: 15px;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .fuji-hero-link { transition: none; }
 }

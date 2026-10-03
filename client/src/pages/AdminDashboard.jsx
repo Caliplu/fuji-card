@@ -14,6 +14,9 @@ const AdminDashboard = () => {
 
     // Products State
     const [products, setProducts] = useState([]);
+    const [supplierSearch, setSupplierSearch] = useState('');
+    const [imageSourceFilter, setImageSourceFilter] = useState('all');
+    const [catalogLoadError, setCatalogLoadError] = useState(false);
     const [isEditing, setIsEditing] = useState(null);
     const [editForm, setEditForm] = useState({});
     const [isSaving, setIsSaving] = useState(false);
@@ -91,7 +94,7 @@ const AdminDashboard = () => {
 
         if (activeTab === 'dashboard') {
             fetchStats(token);
-        } else if (activeTab === 'products') {
+        } else if (activeTab === 'products' || activeTab === 'supplier') {
             fetchProducts();
         } else if (activeTab === 'users') {
             fetchUsers();
@@ -126,20 +129,65 @@ const AdminDashboard = () => {
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            // Add cache busting to admin product list
-            const { data } = await axios.get(`${API_URL}/products?limit=2000&_t=${Date.now()}`);
-            
-            // Normalize snake_case from DB to camelCase for component consistency
-            const normalized = (data.products || data).map(p => ({
+            setCatalogLoadError(false);
+            const allProducts = [];
+            for (let page = 1; ; page++) {
+                const { data } = await axios.get(`${API_URL}/products`, {
+                    params: { page, limit: 500, _t: Date.now() }
+                });
+                allProducts.push(...(data.products || []));
+                if (!data.pagination?.hasMore) break;
+            }
+
+            const normalized = allProducts.map(p => ({
                 ...p,
                 cardType: p.card_type || p.cardType || 'Character',
-                image_url: p.image_url || p.image // Handle both just in case
+                image_url: p.image_url || p.image
             }));
             setProducts(normalized);
         } catch (err) {
+            setCatalogLoadError(true);
             console.error("Failed to fetch products", err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const exportSupplierReview = () => {
+        if (!products.length || catalogLoadError) return;
+        const cell = value => {
+            const raw = String(value ?? '');
+            const safe = /^[=+@-]/.test(raw) ? "'" + raw : raw;
+            return '"' + safe.replaceAll('"', '""') + '"';
+        };
+        const columns = [
+            'product_id', 'name', 'category', 'set_name', 'language',
+            'current_price_gbp', 'recorded_stock', 'supplier_sku',
+            'supplier_available_quantity', 'supplier_unit_cost',
+            'lead_time_days', 'image_permission_or_url', 'quote_reference',
+            'current_image_url', 'current_image_source'
+        ];
+        const rows = products.map(product => [
+            product.id, product.name, product.categories?.name || product.category,
+            product.set_name || product.set, product.language, product.price, product.stock,
+            '', '', '', '', '', '', product.image_url, getImageSource(product.image_url)
+        ].map(cell).join(','));
+        const csv = [columns.join(','), ...rows].join(String.fromCharCode(13, 10));
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'fuji-card-supplier-review.csv';
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
+    const getImageSource = imageUrl => {
+        if (!imageUrl) return 'Missing';
+        try {
+            const url = new URL(imageUrl, window.location.origin);
+            return url.origin === window.location.origin ? 'Fuji Card / local' : url.hostname;
+        } catch {
+            return 'Invalid URL';
         }
     };
 
@@ -316,11 +364,6 @@ const AdminDashboard = () => {
         reader.readAsDataURL(file);
     };
 
-    const isUUID = (str) => {
-        const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        return regex.test(str);
-    };
-
     const handleSaveProduct = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('adminToken');
@@ -331,17 +374,8 @@ const AdminDashboard = () => {
                     headers: { Authorization: `Bearer ${token}` }
                 });
             } else {
-                // Determine if we update (UUID) or convert to DB (Non-UUID)
-                const url = isUUID(isEditing)
-                    ? `${API_URL}/admin/products/${isEditing}`
-                    : `${API_URL}/admin/products`;
-
-                const method = isUUID(isEditing) ? 'put' : 'post';
-
-                await axios({
-                    method,
-                    url,
-                    data: editForm,
+                // Product IDs are text in the live catalog, including imported "cc-" IDs.
+                await axios.put(`${API_URL}/admin/products/${isEditing}`, editForm, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
             }
@@ -558,6 +592,7 @@ const AdminDashboard = () => {
                 <ul className="admin-nav-links">
                     <li className={activeTab === 'dashboard' ? 'active' : ''} onClick={() => setActiveTab('dashboard')}>System Overview</li>
                     <li className={activeTab === 'products' ? 'active' : ''} onClick={() => setActiveTab('products')}>Cards Management</li>
+                    <li className={activeTab === 'supplier' ? 'active' : ''} onClick={() => setActiveTab('supplier')}>Supplier Review</li>
                     <li className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>Users Management</li>
                     <li className={activeTab === 'orders' ? 'active' : ''} onClick={() => setActiveTab('orders')}>Orders Tracking</li>
                     <li className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>Payment Settings</li>
@@ -916,6 +951,72 @@ const AdminDashboard = () => {
                             )}
                         </div>
                     </div>
+                )}
+
+                {!loading && !isEditing && activeTab === 'supplier' && (
+                    <section className="glass-panel" style={{ padding: '2rem', marginTop: '1rem' }}>
+                        <header className="admin-dashboard-header">
+                            <h1>Supplier Review</h1>
+                            <p>Check exact products, quantities, cost and image rights with your TCG supplier before updating the public catalog.</p>
+                        </header>
+                        {catalogLoadError ? (
+                            <div role="alert">
+                                <p>Catalog could not be loaded. No supplier sheet was prepared.</p>
+                                <button className="admin-btn-secondary" onClick={fetchProducts}>Try Again</button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="admin-stats-grid">
+                                    <div className="stat-card glass-panel"><h3>Catalog entries</h3><div className="stat-value">{products.length}</div></div>
+                                    <div className="stat-card glass-panel"><h3>Recorded stock above zero</h3><div className="stat-value">{products.filter(p => Number(p.stock) > 0).length}</div></div>
+                                    <div className="stat-card glass-panel"><h3>Missing images</h3><div className="stat-value">{products.filter(p => !p.image_url).length}</div></div>
+                                    <div className="stat-card glass-panel"><h3>External image sources</h3><div className="stat-value">{new Set(products.map(p => getImageSource(p.image_url)).filter(source => source !== 'Missing' && source !== 'Fuji Card / local')).size}</div></div>
+                                </div>
+                                <p>Recorded stock is the database value. Supplier availability has not been verified in this dashboard.</p>
+                                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', margin: '1.5rem 0' }}>
+                                    <button className="admin-btn-primary" onClick={exportSupplierReview} disabled={!products.length}>Download supplier review CSV</button>
+                                    <button className="admin-btn-secondary" onClick={() => { setActiveTab('products'); handleEditClick({}); }}>Add a confirmed product</button>
+                                    <input aria-label="Search supplier review products" placeholder="Search name, set or ID"
+                                        value={supplierSearch} onChange={event => setSupplierSearch(event.target.value)}
+                                        style={{ padding: '.65rem', minWidth: '220px', flex: 1 }} />
+                                    <select aria-label="Filter image source" value={imageSourceFilter} onChange={event => setImageSourceFilter(event.target.value)} style={{ padding: '.65rem', minWidth: '190px' }}>
+                                        <option value="all">All image sources</option>
+                                        <option value="external">External images</option>
+                                        <option value="local">Fuji Card / local</option>
+                                        <option value="missing">Missing images</option>
+                                    </select>
+                                </div>
+                                <p>The CSV includes each current image URL and source. Supplier SKU, confirmed quantity, cost, lead time, image permission and quote reference remain blank for the supplier to complete. New products start at zero stock until you enter a confirmed quantity.</p>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table className="admin-table" style={{ width: '100%' }}>
+                                        <thead><tr><th>Image</th><th>Product</th><th>Image source</th><th>Set / language</th><th>Recorded stock</th><th>Listed price</th><th>Action</th></tr></thead>
+                                        <tbody>
+                                            {products.filter(p => {
+                                                const term = supplierSearch.trim().toLowerCase();
+                                                const source = getImageSource(p.image_url);
+                                                const matchesSource = imageSourceFilter === 'all' ||
+                                                    (imageSourceFilter === 'external' && source !== 'Missing' && source !== 'Fuji Card / local') ||
+                                                    (imageSourceFilter === 'local' && source === 'Fuji Card / local') ||
+                                                    (imageSourceFilter === 'missing' && source === 'Missing');
+                                                return matchesSource && (!term || [p.name, p.id, p.set_name, p.language, source].some(value => String(value || '').toLowerCase().includes(term)));
+                                            }).slice(0, 40).map(product => (
+                                                <tr key={product.id}>
+                                                    <td>{product.image_url ? <img src={product.image_url} alt="" loading="lazy" style={{ width: 48, height: 64, objectFit: 'contain' }} /> : '—'}</td>
+                                                    <td>{product.name}</td>
+                                                    <td>{getImageSource(product.image_url)}</td>
+                                                    <td>{product.set_name || '—'} / {product.language || '—'}</td>
+                                                    <td>{product.stock}</td>
+                                                    <td>£{Number(product.price).toFixed(2)}</td>
+                                                    <td><button className="admin-btn-secondary" onClick={() => { setActiveTab('products'); handleEditClick(product); }}>Edit</button></td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p>Showing up to 40 matches. The CSV includes the full catalog.</p>
+                            </>
+                        )}
+                    </section>
                 )}
 
                 {!loading && activeTab === 'products' && !isEditing && (

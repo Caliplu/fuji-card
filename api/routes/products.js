@@ -2,6 +2,20 @@ import express from 'express';
 import { supabase } from '../config/supabase.js';
 
 const router = express.Router();
+const typeTerms = {
+  booster: { name: ['booster'], description: ['booster'] },
+  special: { name: ['special', 'high class'], description: ['special'] },
+  promo: { name: ['promo'], description: ['promo'] },
+  sealed: { name: ['sealed', 'case'], description: ['sealed'] },
+  weiss: { name: ['weiss'], description: ['weiss'] },
+  union: { name: ['union'], description: ['union'] },
+  hololive: { name: ['hololive'], description: ['hololive'] },
+  lycee: { name: ['lycee'], description: ['lycee'] },
+  gundam: { name: ['gundam'], description: ['gundam'] },
+  dragonball: { name: ['dragon ball', 'fusion'], description: ['dragon ball'] },
+  disney: { name: ['lorcana', 'disney'], description: ['lorcana', 'disney'] },
+  mtg: { name: ['magic', 'mtg'], description: ['magic', 'mtg'] }
+};
 const toStoreProduct = (product) => ({
   ...product,
   category: product.categories?.name || 'other',
@@ -36,7 +50,7 @@ router.get('/filters/options', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const { category, search, minPrice, maxPrice, rarity, condition,
+    const { category, search, type, minPrice, maxPrice, rarity, condition,
       language, set, sort, featured } = req.query;
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(1000, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
@@ -44,7 +58,19 @@ router.get('/', async (req, res) => {
       .select('*, categories!inner(id, name)', { count: 'exact' });
 
     if (category) query = query.eq('categories.name', category);
-    if (search) query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+    // PostgREST's raw `or` syntax needs its delimiters removed from user input.
+    const safeSearch = typeof search === 'string'
+      ? search.replace(/[(),.%*\\]/g, ' ').trim().slice(0, 100)
+      : '';
+    const searchFilter = safeSearch
+      ? ['name', 'description', 'set_name'].map(field => `${field}.ilike.%${safeSearch}%`).join(',')
+      : '';
+    const terms = typeof type === 'string' && Object.hasOwn(typeTerms, type) ? typeTerms[type] : null;
+    const typeFilter = terms
+      ? Object.entries(terms).flatMap(([field, words]) => words.map(word => `${field}.ilike.%${word}%`)).join(',')
+      : '';
+    if (searchFilter && typeFilter) query = query.or(`and(or(${searchFilter}),or(${typeFilter}))`);
+    else if (searchFilter || typeFilter) query = query.or(searchFilter || typeFilter);
     if (minPrice && Number.isFinite(Number(minPrice))) query = query.gte('price', Number(minPrice));
     if (maxPrice && Number.isFinite(Number(maxPrice))) query = query.lte('price', Number(maxPrice));
     if (rarity) query = query.eq('rarity', rarity);

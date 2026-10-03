@@ -11,7 +11,6 @@ const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [pagination, setPagination] = useState({});
-  const [filterOptions, setFilterOptions] = useState({});
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -24,73 +23,9 @@ const Products = () => {
       setLoading(true);
       setLoadError(false);
       const params = Object.fromEntries(searchParams.entries());
-      const response = await axios.get(`${API_URL}/products`, { params: { ...params, limit: 1000 } });
-      
-      // Manual Filtering across everything
-      let filtered = response.data?.products || [];
-      
-      if (category) {
-        filtered = filtered.filter(p => {
-          const pCat = (p.categories?.name || p.category?.name || p.category || 'other').toString().toLowerCase().replace(/[^a-z0-9]/g, '');
-          const targetCat = category.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return pCat === targetCat;
-        });
-      }
-      
-      if (search) {
-        const s = search.toLowerCase();
-        filtered = filtered.filter(p => 
-          p.name.toLowerCase().includes(s) || 
-          p.description?.toLowerCase().includes(s) ||
-          p.set?.toLowerCase().includes(s) ||
-          p.set_name?.toLowerCase().includes(s)
-        );
-      }
-
-      const type = searchParams.get('type');
-      if (type) {
-        const t = type.toLowerCase();
-        filtered = filtered.filter(p => {
-          const name = p.name.toLowerCase();
-          const desc = (p.description || '').toLowerCase();
-          
-          if (t === 'booster') return name.includes('booster') || desc.includes('booster');
-          if (t === 'special') return name.includes('special') || name.includes('high class') || desc.includes('special');
-          if (t === 'promo') return name.includes('promo') || desc.includes('promo');
-          if (t === 'sealed') return name.includes('sealed') || name.includes('case') || desc.includes('sealed');
-          
-          // OTHER TCG Types
-          if (t === 'weiss') return name.includes('weiss') || desc.includes('weiss');
-          if (t === 'union') return name.includes('union') || desc.includes('union');
-          if (t === 'hololive') return name.includes('hololive') || desc.includes('hololive');
-          if (t === 'lycee') return name.includes('lycee') || desc.includes('lycee');
-          if (t === 'gundam') return name.includes('gundam') || desc.includes('gundam');
-          if (t === 'dragonball') return name.includes('dragon ball') || name.includes('fusion') || desc.includes('dragon ball');
-          if (t === 'disney') return name.includes('lorcana') || name.includes('disney') || desc.includes('lorcana');
-          if (t === 'mtg') return name.includes('magic') || name.includes('mtg') || desc.includes('magic');
-
-          return true;
-        });
-      }
-      
-      const minPrice = parseFloat(searchParams.get('minPrice')) || 0;
-      const maxPrice = parseFloat(searchParams.get('maxPrice')) || 1000000;
-      filtered = filtered.filter(p => p.price >= minPrice && p.price <= maxPrice);
-      
-      const sort = searchParams.get('sort');
-      if (sort === 'price_asc') filtered.sort((a,b) => a.price - b.price);
-      else if (sort === 'price_desc') filtered.sort((a,b) => b.price - a.price);
-      else if (sort === 'name_asc') filtered.sort((a,b) => a.name.localeCompare(b.name));
-      else {
-        // Default sort (newest or featured)
-      }
-      
-      setProducts(filtered);
-      setPagination({
-        totalProducts: filtered.length,
-        totalPages: 1,
-        currentPage: 1
-      });
+      const response = await axios.get(`${API_URL}/products`, { params: { ...params, limit: 24 } });
+      setProducts(response.data?.products || []);
+      setPagination(response.data?.pagination || {});
     } catch (error) {
       console.error('Product load failure:', error);
       setLoadError(true);
@@ -98,21 +33,11 @@ const Products = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchParams, category, search]);
-
-  const fetchFilterOptions = useCallback(async () => {
-    try {
-      const response = await axios.get(`${API_URL}/products/filters/options`, { params: { category } });
-      setFilterOptions(response.data);
-    } catch (error) {
-      setFilterOptions({ rarities: [], conditions: [], languages: [], sets: [] });
-    }
-  }, [category]);
+  }, [searchParams]);
 
   useEffect(() => {
     fetchProducts();
-    fetchFilterOptions();
-  }, [fetchProducts, fetchFilterOptions]);
+  }, [fetchProducts]);
 
   const handleFilterChange = (key, value) => {
     const newParams = new URLSearchParams(searchParams);
@@ -134,6 +59,13 @@ const Products = () => {
 
   const clearFilters = () => {
     setSearchParams({});
+  };
+
+  const changePage = (page) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', String(page));
+    setSearchParams(newParams);
+    document.querySelector('.products-header')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const getCategoryTitle = () => {
@@ -217,9 +149,20 @@ const Products = () => {
                 <button onClick={clearFilters} className="btn btn-primary">Reset Filters</button>
               </div>
             ) : (
-              <div className="products-grid">
-                {products.map(product => <ProductCard key={product.id} product={product} />)}
-              </div>
+              <>
+                <div className="products-grid">
+                  {products.map(product => <ProductCard key={product.id} product={product} />)}
+                </div>
+                {pagination.totalPages > 1 && (
+                  <nav className="catalog-pagination" aria-label="Product pages">
+                    <button type="button" disabled={pagination.currentPage === 1}
+                      onClick={() => changePage(pagination.currentPage - 1)}>Previous</button>
+                    <span>Page {pagination.currentPage} of {pagination.totalPages}</span>
+                    <button type="button" disabled={pagination.currentPage === pagination.totalPages}
+                      onClick={() => changePage(pagination.currentPage + 1)}>Next</button>
+                  </nav>
+                )}
+              </>
             )}
           </main>
         </div>

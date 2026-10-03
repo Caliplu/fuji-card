@@ -14,6 +14,27 @@ import { products as bundledCatalog } from '../data/store.js';
 
 const router = express.Router();
 
+const productColumns = new Set([
+    'name', 'description', 'price', 'original_price', 'image_url', 'category_id',
+    'card_type', 'set_name', 'rarity', 'condition', 'language', 'stock',
+    'featured', 'promo', 'discount', 'graded', 'grading_company', 'grade'
+]);
+const productAliases = {
+    cardType: 'card_type', set: 'set_name', originalPrice: 'original_price',
+    image: 'image_url', gradingCompany: 'grading_company'
+};
+const productFields = input => {
+    const fields = {};
+    for (const [alias, column] of Object.entries(productAliases)) {
+        if (input[alias] !== undefined) fields[column] = input[alias];
+    }
+    // Canonical fields win when the API response also carries display aliases.
+    for (const column of productColumns) {
+        if (input[column] !== undefined) fields[column] = input[column];
+    }
+    return fields;
+};
+
 // --- IMAGE PROCESSING HELPERS ---
 const uploadBase64Image = async (base64Str, productName) => {
     if (!base64Str || !base64Str.startsWith('data:')) return base64Str; // Not a base64 or already a URL
@@ -290,7 +311,12 @@ router.post('/products', async (req, res) => {
             newProduct.image_url = await uploadBase64Image(newProduct.image_url, newProduct.name);
         }
 
-        const { data, error } = await supabase.from('products').insert([newProduct]).select().single();
+        const product = productFields(newProduct);
+        if (!product.name?.trim() || !product.category_id || !Number.isFinite(Number(product.price)) || Number(product.price) <= 0) {
+            return res.status(400).json({ error: 'A product needs a name, category and positive price.' });
+        }
+        product.price = Number(product.price);
+        const { data, error } = await supabase.from('products').insert([product]).select().single();
         if (error) throw error;
         res.json(data);
     } catch (error) {
@@ -397,23 +423,23 @@ router.put('/products/:id', async (req, res) => {
         if (updateData.featured !== undefined) updateData.featured = updateData.featured === 'true' || updateData.featured === true;
         if (updateData.promo !== undefined) updateData.promo = updateData.promo === 'true' || updateData.promo === true;
 
-        console.log(`[Admin] UPSERTING product ${req.params.id} with data:`, updateData);
+        console.log(`[Admin] Updating product ${req.params.id}`);
 
         if (supabase) {
-            const { data, error } = await supabase.from('products').upsert({
-                ...updateData,
-                id: req.params.id
-            }).select();
-            if (error) throw error;
-
-            if (!data || data.length === 0) {
-                return res.status(404).json({
-                    error: 'Product not found or update blocked by database policies (RLS).',
-                    details: 'Ensure the Product ID is correct and you are using a Service Role Key if RLS is enabled.'
-                });
+            const product = productFields(updateData);
+            if (!product.name?.trim() || !Number.isFinite(Number(product.price)) || Number(product.price) <= 0) {
+                return res.status(400).json({ error: 'A product needs a name, category and positive price.' });
             }
-
-            return res.json(data[0]);
+            product.price = Number(product.price);
+            if (product.image_url?.startsWith('data:')) {
+                product.image_url = await uploadBase64Image(product.image_url, product.name);
+            }
+            const { data, error } = await supabase.from('products')
+                .update({ ...product, updated_at: new Date().toISOString() })
+                .eq('id', req.params.id).select().maybeSingle();
+            if (error) throw error;
+            if (!data) return res.status(404).json({ error: 'Product not found' });
+            return res.json(data);
         } else {
             // FALLBACK: Update local memory and attempt to persist to store.js
             console.log('⚠️ [Admin] Supabase disconnected. Updating local store files...');

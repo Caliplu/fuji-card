@@ -20,7 +20,7 @@ const Home = () => {
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
-        const response = await axios.get(`${API_URL}/products?featured=true&limit=1000`);
+        const response = await axios.get(`${API_URL}/products?featured=true&limit=12`);
         setFeaturedProducts(response.data.products || []);
       } catch (error) {
         console.error('Featured products unavailable:', error);
@@ -57,7 +57,7 @@ const Home = () => {
           <div className="collection-gallery-grid">
             {collections.map(collection => (
               <Link className="collection-gallery-card" to={`/products?category=${collection.category}`} key={collection.category}>
-                <img src={collection.image} alt={`${collection.name} trading cards`} loading="lazy"
+                <img src={collection.image} alt={`${collection.name} trading cards`} loading="lazy" decoding="async" width="750" height="750"
                   onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = '/logo.png'; }} />
                 <div className="collection-gallery-label"><strong>{collection.name}</strong><span>Shop collection →</span></div>
               </Link>

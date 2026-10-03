@@ -122,3 +122,12 @@
     font-size: 12px;
   }
 }
+
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .premium-product-wrapper, .premium-bg-image {
+    transition: none;
+  }
+  .premium-product-wrapper:hover, .premium-product-card:hover .premium-bg-image {
+    transform: none;
+  }
+}

@@ -47,6 +47,10 @@ const ProductCard = ({ product }) => {
         <img 
           src={imageError ? placeholderImage : imageUrl} 
           alt={product.name}
+          loading="lazy"
+          decoding="async"
+          width="600"
+          height="780"
           onError={() => { if (!imageError) setImageError(true); }}
         />
         {/* Removed gallery controls (arrows and dots) per request */}
