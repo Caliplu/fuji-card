@@ -37,42 +37,36 @@ const productFields = input => {
 
 // --- IMAGE PROCESSING HELPERS ---
 const uploadBase64Image = async (base64Str, productName) => {
-    if (!base64Str || !base64Str.startsWith('data:')) return base64Str; // Not a base64 or already a URL
+    if (!base64Str || !base64Str.startsWith('data:')) return base64Str;
 
-    try {
-        const matches = base64Str.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
-        if (!matches || matches.length !== 3) return base64Str;
+    const imageTypes = { jpeg: 'jpg', png: 'png', webp: 'webp', gif: 'gif' };
+    const matches = /^data:image\/(jpeg|png|webp|gif);base64,([A-Za-z0-9+/]+={0,2})$/.exec(base64Str);
+    if (!matches) throw Object.assign(new Error('Use a JPEG, PNG, WebP or GIF image.'), { status: 400 });
 
-        const extension = matches[1];
-        const base64Data = matches[2];
-        const buffer = Buffer.from(base64Data, 'base64');
-        const fileName = `products/${productName.replace(/[^A-Za-z0-9]/g, '_')}_${Date.now()}.${extension}`;
-
-        // Attempt upload. Bucket name 'product-images' or 'products'
-        const { data, error } = await supabase.storage
-            .from('products')
-            .upload(fileName, buffer, {
-                contentType: `image/${extension}`,
-                upsert: true
-            });
-
-        if (error) {
-            console.error('[Admin] Supabase Storage upload error:', error);
-            // Fallback to original string (usually it works but is slow)
-            return base64Str;
-        }
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-            .from('products')
-            .getPublicUrl(fileName);
-
-        console.log(`[Admin] Image successfully uploaded to Supabase Storage: ${publicUrl}`);
-        return publicUrl;
-    } catch (err) {
-        console.error('[Admin] Image processing failed:', err);
-        return base64Str;
+    const buffer = Buffer.from(matches[2], 'base64');
+    if (!buffer.length || buffer.length > 8 * 1024 * 1024) {
+        throw Object.assign(new Error('Image must be smaller than 8 MB.'), { status: 400 });
     }
+    const name = String(productName || 'product').replace(/[^A-Za-z0-9]/g, '_').slice(0, 60);
+    const fileName = `products/${name}_${Date.now()}_${Math.random().toString(36).slice(2)}.${imageTypes[matches[1]]}`;
+    let error;
+    try {
+        ({ error } = await supabase.storage.from('products').upload(fileName, buffer, {
+            contentType: `image/${matches[1]}`,
+            upsert: false
+        }));
+    } catch (uploadError) {
+        console.error('[Admin] Product image upload failed:', uploadError);
+        throw Object.assign(new Error('Image upload failed. Product was not saved; please try again.'), { status: 502 });
+    }
+    if (error) {
+        console.error('[Admin] Product image upload failed:', error);
+        throw Object.assign(new Error('Image upload failed. Product was not saved; please try again.'), { status: 502 });
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(fileName);
+    if (!publicUrl) throw Object.assign(new Error('Image URL unavailable. Product was not saved.'), { status: 502 });
+    return publicUrl;
 };
 
 // --- SETTINGS MIGRATION (SUPABASE) ---
@@ -306,22 +300,20 @@ router.post('/products', async (req, res) => {
             delete newProduct.category_name;
         }
 
-        // Handle base64 image upload to storage
-        if (newProduct.image_url && newProduct.image_url.startsWith('data:')) {
-            newProduct.image_url = await uploadBase64Image(newProduct.image_url, newProduct.name);
-        }
-
         const product = productFields(newProduct);
         if (!product.name?.trim() || !product.category_id || !Number.isFinite(Number(product.price)) || Number(product.price) <= 0) {
             return res.status(400).json({ error: 'A product needs a name, category and positive price.' });
         }
         product.price = Number(product.price);
+        if (product.image_url?.startsWith('data:')) {
+            product.image_url = await uploadBase64Image(product.image_url, product.name);
+        }
         const { data, error } = await supabase.from('products').insert([product]).select().single();
         if (error) throw error;
         res.json(data);
     } catch (error) {
         console.error('Error adding product:', error);
-        res.status(500).json({ error: 'Failed to add product', details: error.message });
+        res.status(error.status || 500).json({ error: error.status ? error.message : 'Failed to add product', details: error.message });
     }
 });
 
@@ -454,7 +446,7 @@ router.put('/products/:id', async (req, res) => {
         }
     } catch (error) {
         console.error('Error updating product:', error);
-        res.status(500).json({ error: 'Failed to update product', details: error.message });
+        res.status(error.status || 500).json({ error: error.status ? error.message : 'Failed to update product', details: error.message });
     }
 });
 
