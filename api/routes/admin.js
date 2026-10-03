@@ -23,10 +23,17 @@ const productAliases = {
     cardType: 'card_type', set: 'set_name', originalPrice: 'original_price',
     image: 'image_url', gradingCompany: 'grading_company'
 };
-const productFields = input => Object.fromEntries(
-    Object.entries(input).map(([key, value]) => [productAliases[key] || key, value])
-        .filter(([key, value]) => productColumns.has(key) && value !== undefined)
-);
+const productFields = input => {
+    const fields = {};
+    for (const [alias, column] of Object.entries(productAliases)) {
+        if (input[alias] !== undefined) fields[column] = input[alias];
+    }
+    // Canonical fields win when the API response also carries display aliases.
+    for (const column of productColumns) {
+        if (input[column] !== undefined) fields[column] = input[column];
+    }
+    return fields;
+};
 
 // --- IMAGE PROCESSING HELPERS ---
 const uploadBase64Image = async (base64Str, productName) => {
