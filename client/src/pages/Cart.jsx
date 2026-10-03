@@ -34,6 +34,7 @@ const Cart = () => {
   };
 
   const subtotal = parseFloat(cart.subtotal) || 0;
+  const hasUnavailableItems = cart.items.some(item => !item.product);
 
   if (loading && cart.items.length === 0) {
     return (
@@ -78,22 +79,25 @@ const Cart = () => {
               <div key={item.id} className="cart-item">
                 <div className="item-image">
                   <img 
-                    src={item.product.image || item.product.image_url} 
-                    alt={item.product.name}
+                    src={item.product?.image || item.product?.image_url || '/logo.png'} 
+                    alt={item.product?.name || 'Unavailable product'}
                     onError={(e) => {
-                      e.target.src = `https://via.placeholder.com/100x130?text=${encodeURIComponent(item.product.name)}`;
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = '/logo.png';
                     }}
                   />
                 </div>
                 <div className="item-details">
-                  <Link to={`/product/${item.product.id}`} className="item-name">
-                    {item.product.name}
-                  </Link>
+                  {item.product ? (
+                    <Link to={`/product/${item.product.id}`} className="item-name">{item.product.name}</Link>
+                  ) : (
+                    <span className="item-name">Product unavailable — remove this item</span>
+                  )}
                   <div className="item-meta">
-                    <span>{item.product.set_name || item.product.set}</span>
-                    <span>{item.product.condition}</span>
+                    <span>{item.product?.set_name || item.product?.set || ''}</span>
+                    <span>{item.product?.condition || ''}</span>
                   </div>
-                  <div className="item-price">{formatPrice(item.product.price)}</div>
+                  <div className="item-price">{item.product ? formatPrice(item.product.price) : 'Unavailable'}</div>
                 </div>
                 <div className="item-quantity">
                   <button 
@@ -105,13 +109,13 @@ const Cart = () => {
                   <span>{item.quantity}</span>
                   <button 
                     onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                    disabled={item.quantity >= item.product.stock}
+                    disabled={!item.product || item.quantity >= Number(item.product.stock)}
                   >
                     +
                   </button>
                 </div>
                 <div className="item-total">
-                  {formatPrice(item.product.price * item.quantity)}
+                  {item.product ? formatPrice(item.product.price * item.quantity) : 'Unavailable'}
                 </div>
                 <button 
                   className="remove-btn"
@@ -140,9 +144,11 @@ const Cart = () => {
               <span>Items subtotal</span>
               <span>{getSymbol()}{convertPrice(subtotal)}</span>
             </div>
-            <Link to="/checkout" className="checkout-btn">
-              Proceed to Checkout
-            </Link>
+            {hasUnavailableItems ? (
+              <p role="status">Remove unavailable products before checkout.</p>
+            ) : (
+              <Link to="/checkout" className="checkout-btn">Proceed to Checkout</Link>
+            )}
             <Link to="/products" className="continue-shopping">
               Continue Shopping
             </Link>
