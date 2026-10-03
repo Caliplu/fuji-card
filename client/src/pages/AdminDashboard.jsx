@@ -94,6 +94,8 @@ const AdminDashboard = () => {
 
     // File Input Ref for click-to-upload
     const fileInputRef = useRef(null);
+    const catalogLoadedRef = useRef(false);
+    const catalogRequestRef = useRef(null);
 
     const API_URL = import.meta.env.VITE_API_URL || '/api';
     const lowStockProducts = useMemo(() => products
@@ -115,28 +117,29 @@ const AdminDashboard = () => {
     useEffect(() => {
         const token = localStorage.getItem('adminToken');
         if (!token) return;
+        let active = true;
 
         if (activeTab === 'dashboard') {
-            fetchStats(token);
+            setLoading(true);
+            Promise.all([fetchStats(token, false), catalogLoadedRef.current ? Promise.resolve() : fetchProducts(false)])
+                .finally(() => { if (active) setLoading(false); });
         } else if (activeTab === 'products' || activeTab === 'supplier') {
-            fetchProducts();
+            if (catalogLoadedRef.current) setLoading(false);
+            else fetchProducts();
         } else if (activeTab === 'users') {
             fetchUsers();
         } else if (activeTab === 'orders') {
             fetchOrders();
         } else if (activeTab === 'settings') {
-            fetchPaystackConfig(token);
-            fetchPayfastConfig(token);
+            setLoading(true);
+            Promise.all([fetchPaystackConfig(token, false), fetchPayfastConfig(token, false)])
+                .finally(() => { if (active) setLoading(false); });
         }
+        return () => { active = false; };
     }, [activeTab]);
 
-    // Fetch all products on mount so Low Stock panel on dashboard has data
-    useEffect(() => {
-        fetchProducts();
-    }, []);
-
-    const fetchStats = async (token) => {
-        setLoading(true);
+    const fetchStats = async (token, manageLoading = true) => {
+        if (manageLoading) setLoading(true);
         try {
             const { data } = await axios.get(`${API_URL}/admin/stats`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -146,34 +149,42 @@ const AdminDashboard = () => {
             if (err.response?.status === 401 || err.response?.status === 403) navigate('/secret-fuji-admin');
             console.error(err);
         } finally {
-            setLoading(false);
+            if (manageLoading) setLoading(false);
         }
     };
 
-    const fetchProducts = async () => {
-        setLoading(true);
+    const fetchProducts = async (manageLoading = true) => {
+        if (manageLoading) setLoading(true);
         try {
-            setCatalogLoadError(false);
-            const allProducts = [];
-            for (let page = 1; ; page++) {
-                const { data } = await axios.get(`${API_URL}/products`, {
-                    params: { page, limit: 500, _t: Date.now() }
-                });
-                allProducts.push(...(data.products || []));
-                if (!data.pagination?.hasMore) break;
-            }
+            if (!catalogRequestRef.current) {
+                catalogRequestRef.current = (async () => {
+                    setCatalogLoadError(false);
+                    const allProducts = [];
+                    for (let page = 1; ; page++) {
+                        const { data } = await axios.get(`${API_URL}/products`, {
+                            params: { page, limit: 500, _t: Date.now() }
+                        });
+                        allProducts.push(...(data.products || []));
+                        if (!data.pagination?.hasMore) break;
+                    }
 
-            const normalized = allProducts.map(p => ({
-                ...p,
-                cardType: p.card_type || p.cardType || 'Character',
-                image_url: p.image_url || p.image
-            }));
-            setProducts(normalized);
+                    const normalized = allProducts.map(p => ({
+                        ...p,
+                        cardType: p.card_type || p.cardType || 'Character',
+                        image_url: p.image_url || p.image
+                    }));
+                    setProducts(normalized);
+                    catalogLoadedRef.current = true;
+                })().finally(() => {
+                    catalogRequestRef.current = null;
+                });
+            }
+            await catalogRequestRef.current;
         } catch (err) {
             setCatalogLoadError(true);
             console.error("Failed to fetch products", err);
         } finally {
-            setLoading(false);
+            if (manageLoading) setLoading(false);
         }
     };
 
@@ -268,8 +279,8 @@ const AdminDashboard = () => {
         }
     };
 
-    const fetchPaystackConfig = async (token) => {
-        setLoading(true);
+    const fetchPaystackConfig = async (token, manageLoading = true) => {
+        if (manageLoading) setLoading(true);
         try {
             const { data } = await axios.get(`${API_URL}/admin/paystack-config`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -278,7 +289,7 @@ const AdminDashboard = () => {
         } catch (err) {
             console.error("Failed to fetch Paystack config", err);
         } finally {
-            setLoading(false);
+            if (manageLoading) setLoading(false);
         }
     };
     const handleSavePaystack = async () => {
@@ -294,8 +305,8 @@ const AdminDashboard = () => {
         }
     };
 
-    const fetchPayfastConfig = async (token) => {
-        setLoading(true);
+    const fetchPayfastConfig = async (token, manageLoading = true) => {
+        if (manageLoading) setLoading(true);
         try {
             const { data } = await axios.get(`${API_URL}/admin/payfast-config`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -304,7 +315,7 @@ const AdminDashboard = () => {
         } catch (err) {
             console.error("Failed to fetch PayFast config", err);
         } finally {
-            setLoading(false);
+            if (manageLoading) setLoading(false);
         }
     };
 
@@ -999,6 +1010,7 @@ const AdminDashboard = () => {
                                 <p>Recorded stock is the database value. Supplier availability has not been verified in this dashboard.</p>
                                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', margin: '1.5rem 0' }}>
                                     <button className="admin-btn-primary" onClick={exportSupplierReview} disabled={!products.length}>Download supplier review CSV</button>
+                                    <button className="admin-btn-secondary" onClick={() => fetchProducts()}>Refresh catalog</button>
                                     <button className="admin-btn-secondary" onClick={() => { setActiveTab('products'); handleEditClick({}); }}>Add a confirmed product</button>
                                     <input aria-label="Search supplier review products" placeholder="Search name, set or ID"
                                         value={supplierSearch} onChange={event => { setSupplierSearch(event.target.value); setSupplierPage(1); }}
@@ -1059,6 +1071,7 @@ const AdminDashboard = () => {
 
                             {!isEditing && (
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                    <button className="admin-btn-secondary" onClick={() => fetchProducts()}>Refresh catalog</button>
                                     <div className="admin-search-wrapper" style={{ position: 'relative' }}>
                                         <input
                                             type="text"
