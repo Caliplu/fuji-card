@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import ProductCard from '../components/ProductCard';
@@ -14,30 +14,37 @@ const Products = () => {
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [retryIndex, setRetryIndex] = useState(0);
 
   const category = searchParams.get('category') || '';
   const search = searchParams.get('search') || '';
 
-  const fetchProducts = useCallback(async () => {
-    try {
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchProducts = async () => {
       setLoading(true);
       setLoadError(false);
-      const params = Object.fromEntries(searchParams.entries());
-      const response = await axios.get(`${API_URL}/products`, { params: { ...params, limit: 24 } });
-      setProducts(response.data?.products || []);
-      setPagination(response.data?.pagination || {});
-    } catch (error) {
-      console.error('Product load failure:', error);
-      setLoadError(true);
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
+      try {
+        const params = Object.fromEntries(searchParams.entries());
+        const response = await axios.get(`${API_URL}/products`, {
+          params: { ...params, limit: 24 }, signal: controller.signal
+        });
+        if (controller.signal.aborted) return;
+        setProducts(response.data?.products || []);
+        setPagination(response.data?.pagination || {});
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('Product load failure:', error);
+        setLoadError(true);
+        setProducts([]);
+        setPagination({});
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
     fetchProducts();
-  }, [fetchProducts]);
+    return () => controller.abort();
+  }, [searchParams, retryIndex]);
 
   const handleFilterChange = (key, value) => {
     const newParams = new URLSearchParams(searchParams);
@@ -85,7 +92,7 @@ const Products = () => {
         <div className="products-header">
           <div className="header-left">
             <h1>{search ? `Search: "${search}"` : getCategoryTitle()}</h1>
-            <span className="product-count">{pagination.totalProducts || 0} items found</span>
+            <span className="product-count">{loading ? 'Loading products…' : loadError ? 'Catalog unavailable' : `${pagination.totalProducts || 0} items found`}</span>
           </div>
           <div className="header-right">
             <button className="filter-toggle" onClick={() => setShowFilters(!showFilters)}>
@@ -140,7 +147,7 @@ const Products = () => {
               <div className="no-results">
                 <h3>Products are temporarily unavailable</h3>
                 <p>Please try again shortly.</p>
-                <button onClick={fetchProducts} className="btn btn-primary">Try Again</button>
+                <button onClick={() => setRetryIndex(index => index + 1)} className="btn btn-primary">Try Again</button>
               </div>
             ) : products.length === 0 ? (
               <div className="no-results">
