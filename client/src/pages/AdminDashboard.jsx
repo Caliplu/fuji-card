@@ -81,6 +81,7 @@ const AdminDashboard = () => {
     // Search filtering state
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedSubCategory, setSelectedSubCategory] = useState(null);
+    const [productPage, setProductPage] = useState(1);
 
     const subCatsMap = {
         'pokemon': ['Booster Boxes Pokemon', 'Special Set Pokemon', 'Promo Cards Pokemon'],
@@ -101,6 +102,20 @@ const AdminDashboard = () => {
     const lowStockProducts = useMemo(() => products
         .filter(product => Number(product.stock) < 10)
         .sort((a, b) => Number(a.stock) - Number(b.stock)), [products]);
+    const filteredAdminProducts = useMemo(() => products.filter(product => {
+        if (!product?.name) return false;
+        const inCategory = searchTerm && !selectedCategory ? true
+            : selectedCategory === 'SOLD_OUT' ? Number(product.stock) === 0
+            : selectedCategory === 'LOW_STOCK' ? Number(product.stock) > 0 && Number(product.stock) < 5
+            : (product.categories?.name || product.category_id || product.category_name) === selectedCategory;
+        return inCategory &&
+            (!selectedSubCategory || selectedSubCategory === '__ALL__' || product.cardType === selectedSubCategory) &&
+            product.name.toLowerCase().includes(searchTerm.trim().toLowerCase());
+    }), [products, selectedCategory, selectedSubCategory, searchTerm]);
+    const productTotalPages = Math.max(1, Math.ceil(filteredAdminProducts.length / 40));
+    const currentProductPage = Math.min(productPage, productTotalPages);
+
+    useEffect(() => setProductPage(1), [selectedCategory, selectedSubCategory, searchTerm]);
 
     // Run strictly once on mount to fetch broad data
     useEffect(() => {
@@ -1280,19 +1295,8 @@ const AdminDashboard = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {Array.isArray(products) && products
-                                            .filter(p => {
-                                                if (!p) return false;
-                                                if (searchTerm && !selectedCategory) return true; // Show all for global search
-                                                if (selectedCategory === 'SOLD_OUT') return Number(p.stock) === 0;
-                                                if (selectedCategory === 'LOW_STOCK') return Number(p.stock) < 5 && Number(p.stock) > 0;
-                                                return (p.categories?.name || p.category_id || p.category_name) === selectedCategory;
-                                            })
-                                            .filter(p => {
-                                                if (!selectedSubCategory || selectedSubCategory === '__ALL__') return true;
-                                                return p.cardType === selectedSubCategory;
-                                            })
-                                            .filter(p => p?.name?.toLowerCase()?.includes(searchTerm.toLowerCase()))
+                                        {filteredAdminProducts
+                                            .slice((currentProductPage - 1) * 40, currentProductPage * 40)
                                             .map(p => (
                                                 <tr key={p.id}>
                                                     {selectedCategory === 'SOLD_OUT' && (
@@ -1319,24 +1323,22 @@ const AdminDashboard = () => {
                                                     </td>
                                                 </tr>
                                             ))}
-                                        {products
-                                            .filter(p => {
-                                                if (searchTerm && !selectedCategory) return true;
-                                                if (selectedCategory === 'SOLD_OUT') return Number(p.stock) === 0;
-                                                if (selectedCategory === 'LOW_STOCK') return Number(p.stock) < 5 && Number(p.stock) > 0;
-                                                return (p.categories?.name || p.category_id || p.category_name) === selectedCategory;
-                                            })
-                                            .filter(p => {
-                                                if (!selectedSubCategory || selectedSubCategory === '__ALL__') return true;
-                                                return p.cardType === selectedSubCategory;
-                                            })
-                                            .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                                        {filteredAdminProducts.length === 0 && (
                                                 <tr>
                                                     <td colSpan={selectedCategory === 'SOLD_OUT' ? 6 : 5} style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No items found in this section.</td>
                                                 </tr>
                                             )}
                                     </tbody>
                                 </table>
+                                {filteredAdminProducts.length > 0 && (
+                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', padding: '1rem' }}>
+                                        <span>{filteredAdminProducts.length} products · Page {currentProductPage} of {productTotalPages}</span>
+                                        <button type="button" className="admin-btn-secondary" disabled={currentProductPage === 1}
+                                            onClick={() => setProductPage(page => Math.max(1, page - 1))}>Previous</button>
+                                        <button type="button" className="admin-btn-secondary" disabled={currentProductPage === productTotalPages}
+                                            onClick={() => setProductPage(page => Math.min(productTotalPages, page + 1))}>Next</button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
