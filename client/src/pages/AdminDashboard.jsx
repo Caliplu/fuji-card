@@ -23,6 +23,15 @@ const ImageAuditPreview = ({ src }) => {
     );
 };
 
+const InventoryThumbnail = ({ src }) => {
+    const [failed, setFailed] = useState(false);
+    useEffect(() => setFailed(false), [src]);
+    if (!src || failed) return <span style={{ color: '#94a3b8', fontSize: '.8rem' }}>No photo</span>;
+    return <img src={src} alt="" loading="lazy" decoding="async" width="48" height="64"
+        style={{ width: 48, height: 64, objectFit: 'contain', background: '#fff', borderRadius: 4 }}
+        onError={() => setFailed(true)} />;
+};
+
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -119,9 +128,11 @@ const AdminDashboard = () => {
             : selectedCategory === 'SOLD_OUT' ? Number(product.stock) === 0
             : selectedCategory === 'LOW_STOCK' ? Number(product.stock) > 0 && Number(product.stock) < 5
             : (product.categories?.name || product.category_id || product.category_name) === selectedCategory;
+        const term = searchTerm.trim().toLowerCase();
         return inCategory &&
             (!selectedSubCategory || selectedSubCategory === '__ALL__' || product.cardType === selectedSubCategory) &&
-            product.name.toLowerCase().includes(searchTerm.trim().toLowerCase());
+            (!term || [product.name, product.id, product.set_name, product.language]
+                .some(value => String(value || '').toLowerCase().includes(term)));
     }), [products, selectedCategory, selectedSubCategory, searchTerm]);
     const productTotalPages = Math.max(1, Math.ceil(filteredAdminProducts.length / 40));
     const currentProductPage = Math.min(productPage, productTotalPages);
@@ -1146,7 +1157,7 @@ const AdminDashboard = () => {
                                     <div className="admin-search-wrapper" style={{ position: 'relative' }}>
                                         <input
                                             type="text"
-                                            placeholder="Global Card Search..."
+                                            placeholder="Search name, ID, set or language..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                             style={{
@@ -1332,6 +1343,7 @@ const AdminDashboard = () => {
                                     <thead>
                                         <tr>
                                             {selectedCategory === 'SOLD_OUT' && <th>Select</th>}
+                                            <th>Photo</th>
                                             <th>Card Name</th>
                                             <th>Category</th>
                                             <th>Price</th>
@@ -1358,6 +1370,7 @@ const AdminDashboard = () => {
                                                             />
                                                         </td>
                                                     )}
+                                                    <td><InventoryThumbnail src={p.image_url} /></td>
                                                     <td>{p.name}</td>
                                                     <td>{p.categories?.name || p.category_id}</td>
                                                     <td>£{Number(p.price).toFixed(2)}</td>
@@ -1370,7 +1383,7 @@ const AdminDashboard = () => {
                                             ))}
                                         {filteredAdminProducts.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={selectedCategory === 'SOLD_OUT' ? 6 : 5} style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No items found in this section.</td>
+                                                    <td colSpan={selectedCategory === 'SOLD_OUT' ? 7 : 6} style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No items found in this section.</td>
                                                 </tr>
                                             )}
                                     </tbody>
