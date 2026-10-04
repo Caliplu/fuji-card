@@ -9,8 +9,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-import { localProductStore } from '../data/flagship_products.js';
-
 const router = express.Router();
 
 const productColumns = new Set([
@@ -193,24 +191,23 @@ router.use(authenticateAdmin);
 // Get global stats
 router.get('/stats', async (req, res) => {
     try {
-        const { count: userCount } = await supabase.from('users').select('*', { count: 'exact', head: true });
-        const { count: productCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
-        const { count: orderCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
+        if (!supabase) return res.status(503).json({ error: 'Admin statistics are temporarily unavailable' });
+        const [users, products, orders] = await Promise.all(['users', 'products', 'orders'].map(table =>
+            supabase.from(table).select('*', { count: 'exact', head: true })
+        ));
+        if (users.error || products.error || orders.error ||
+            [users.count, products.count, orders.count].some(count => !Number.isSafeInteger(count))) {
+            throw users.error || products.error || orders.error || new Error('Statistics count missing');
+        }
 
         res.json({
-            users: userCount || 0,
-            products: productCount || 0,
-            orders: orderCount || 0
+            users: users.count,
+            products: products.count,
+            orders: orders.count
         });
     } catch (error) {
-        console.warn('Admin stats error (Supabase might be disconnected):', error);
-        // Fallback stats
-        res.json({
-            users: 0,
-            products: localProductStore.length,
-            orders: 0,
-            fallbackMode: true
-        });
+        console.warn('Admin stats error:', error);
+        res.status(503).json({ error: 'Admin statistics are temporarily unavailable' });
     }
 });
 

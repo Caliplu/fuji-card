@@ -28,7 +28,8 @@ const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState('dashboard');
 
     // Dashboard Stats
-    const [stats, setStats] = useState({ users: 0, products: 0, orders: 0 });
+    const [stats, setStats] = useState(null);
+    const [statsError, setStatsError] = useState(false);
     const [loading, setLoading] = useState(true);
 
     // Products State
@@ -160,7 +161,10 @@ const AdminDashboard = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setStats(data);
+            setStatsError(false);
         } catch (err) {
+            setStats(null);
+            setStatsError(true);
             if (err.response?.status === 401 || err.response?.status === 403) navigate('/secret-fuji-admin');
             console.error(err);
         } finally {
@@ -735,20 +739,24 @@ const AdminDashboard = () => {
                     <div>
                         <header className="admin-dashboard-header">
                             <h1>System Overview</h1>
+                            <button type="button" className="admin-btn-secondary"
+                                onClick={() => { fetchStats(localStorage.getItem('adminToken')); fetchProducts(false); }}>Refresh overview</button>
                         </header>
+                        {statsError && <p role="alert">Live account, catalog and order counts could not be loaded. Try refreshing the overview.</p>}
+                        {catalogLoadError && <p role="alert">The catalog could not be loaded. Inventory alerts may be incomplete.</p>}
 
                         <div className="admin-stats-grid">
                             <div className="stat-card glass-panel">
                                 <h3>Total Registered Users</h3>
-                                <div className="stat-value">{stats.users} Active</div>
+                                <div className="stat-value">{stats ? `${stats.users} registered` : 'Unavailable'}</div>
                             </div>
                             <div className="stat-card glass-panel">
                                 <h3>Catalog Products</h3>
-                                <div className="stat-value">{stats.products} Listings</div>
+                                <div className="stat-value">{stats ? `${stats.products} listings` : 'Unavailable'}</div>
                             </div>
                             <div className="stat-card glass-panel">
-                                <h3>Total Orders Processed</h3>
-                                <div className="stat-value alert-text">{stats.orders} Actions</div>
+                                <h3>Total Orders</h3>
+                                <div className="stat-value alert-text">{stats ? `${stats.orders} orders` : 'Unavailable'}</div>
                             </div>
                         </div>
 
@@ -855,7 +863,6 @@ const AdminDashboard = () => {
                             <ul className="log-list" style={{ marginTop: '1.5rem' }}>
                                 <li>[Sys] Admin dashboard established contact w/ system.</li>
                                 <li>[Catalog] Recorded quantities need supplier confirmation.</li>
-                                {stats.fallbackMode && <li style={{ color: '#f59e0b' }}>[Warning] Running in Legacy Fallback mode (Supabase disconnected).</li>}
                             </ul>
                         </div>
                     </div>
