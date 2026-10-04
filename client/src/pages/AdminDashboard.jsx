@@ -103,6 +103,14 @@ const AdminDashboard = () => {
     const lowStockProducts = useMemo(() => products
         .filter(product => Number(product.stock) < 10)
         .sort((a, b) => Number(a.stock) - Number(b.stock)), [products]);
+    const imagePeersByUrl = useMemo(() => {
+        const groups = new Map();
+        products.forEach(product => {
+            if (!product.image_url) return;
+            groups.set(product.image_url, [...(groups.get(product.image_url) || []), product]);
+        });
+        return groups;
+    }, [products]);
     const filteredAdminProducts = useMemo(() => products.filter(product => {
         if (!product?.name) return false;
         const inCategory = searchTerm && !selectedCategory ? true
@@ -219,12 +227,13 @@ const AdminDashboard = () => {
             'current_price_gbp', 'recorded_stock', 'supplier_sku',
             'supplier_available_quantity', 'supplier_unit_cost',
             'lead_time_days', 'image_permission_or_url', 'quote_reference',
-            'current_image_url', 'current_image_source'
+            'current_image_url', 'current_image_source', 'shared_image_with_product_ids'
         ];
         const rows = products.map(product => [
             product.id, product.name, product.categories?.name || product.category,
             product.set_name || product.set, product.language, product.price, product.stock,
-            '', '', '', '', '', '', product.image_url, getImageSource(product.image_url)
+            '', '', '', '', '', '', product.image_url, getImageSource(product.image_url),
+            (imagePeersByUrl.get(product.image_url) || []).filter(peer => peer.id !== product.id).map(peer => peer.id).join('; ')
         ].map(cell).join(','));
         const csv = [columns.join(','), ...rows].join(String.fromCharCode(13, 10));
         const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -250,7 +259,8 @@ const AdminDashboard = () => {
         const matchesSource = imageSourceFilter === 'all' ||
             (imageSourceFilter === 'external' && source !== 'Missing' && source !== 'Fuji Card / local') ||
             (imageSourceFilter === 'local' && source === 'Fuji Card / local') ||
-            (imageSourceFilter === 'missing' && source === 'Missing');
+            (imageSourceFilter === 'missing' && source === 'Missing') ||
+            (imageSourceFilter === 'shared' && (imagePeersByUrl.get(product.image_url)?.length || 0) > 1);
         const term = supplierSearch.trim().toLowerCase();
         return matchesSource && (!term || [product.name, product.id, product.set_name, product.language, source]
             .some(value => String(value || '').toLowerCase().includes(term)));
@@ -1039,6 +1049,7 @@ const AdminDashboard = () => {
                                     <div className="stat-card glass-panel"><h3>Recorded stock above zero</h3><div className="stat-value">{products.filter(p => Number(p.stock) > 0).length}</div></div>
                                     <div className="stat-card glass-panel"><h3>Missing images</h3><div className="stat-value">{products.filter(p => !p.image_url).length}</div></div>
                                     <div className="stat-card glass-panel"><h3>External image sources</h3><div className="stat-value">{new Set(products.map(p => getImageSource(p.image_url)).filter(source => source !== 'Missing' && source !== 'Fuji Card / local')).size}</div></div>
+                                    <div className="stat-card glass-panel"><h3>Listings sharing an image</h3><div className="stat-value">{products.filter(p => (imagePeersByUrl.get(p.image_url)?.length || 0) > 1).length}</div></div>
                                 </div>
                                 <p>Recorded stock is the database value. Supplier availability has not been verified in this dashboard.</p>
                                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', margin: '1.5rem 0' }}>
@@ -1053,18 +1064,20 @@ const AdminDashboard = () => {
                                         <option value="external">External images</option>
                                         <option value="local">Fuji Card / local</option>
                                         <option value="missing">Missing images</option>
+                                        <option value="shared">Shared image URLs</option>
                                     </select>
                                 </div>
                                 <p>The CSV includes each current image URL and source. Supplier SKU, confirmed quantity, cost, lead time, image permission and quote reference remain blank for the supplier to complete. New products start at zero stock until you enter a confirmed quantity.</p>
                                 <div style={{ overflowX: 'auto' }}>
                                     <table className="admin-table" style={{ width: '100%' }}>
-                                        <thead><tr><th>Image check</th><th>Product</th><th>Image source</th><th>Set / language</th><th>Recorded stock</th><th>Listed price</th><th>Action</th></tr></thead>
+                                        <thead><tr><th>Image check</th><th>Product</th><th>Image source</th><th>Shared image</th><th>Set / language</th><th>Recorded stock</th><th>Listed price</th><th>Action</th></tr></thead>
                                         <tbody>
                                             {supplierMatches.slice((currentSupplierPage - 1) * 40, currentSupplierPage * 40).map(product => (
                                                 <tr key={product.id}>
                                                     <td><ImageAuditPreview key={product.image_url || 'missing'} src={product.image_url} /></td>
                                                     <td>{product.name}</td>
                                                     <td>{getImageSource(product.image_url)}</td>
+                                                    <td>{(imagePeersByUrl.get(product.image_url) || []).filter(peer => peer.id !== product.id).map(peer => peer.name).join('; ') || '—'}</td>
                                                     <td>{product.set_name || '—'} / {product.language || '—'}</td>
                                                     <td>{product.stock}</td>
                                                     <td>£{Number(product.price).toFixed(2)}</td>
