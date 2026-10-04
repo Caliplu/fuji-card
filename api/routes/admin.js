@@ -277,20 +277,24 @@ router.post('/products', async (req, res) => {
 router.put('/products/bulk-stock', async (req, res) => {
     try {
         const { productIds, stockToAdd } = req.body;
-        if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+        if (!Array.isArray(productIds) || productIds.length === 0 || productIds.length > 1000 ||
+            productIds.some(id => typeof id !== 'string' || !id.trim())) {
             return res.status(400).json({ error: 'No products selected' });
         }
 
-        const addedStock = parseInt(stockToAdd, 10);
-        if (isNaN(addedStock) || addedStock <= 0) {
-            return res.status(400).json({ error: 'Invalid stock number' });
+        const addedStock = Number(stockToAdd);
+        if (stockToAdd === '' || stockToAdd === null || !Number.isSafeInteger(addedStock) || addedStock <= 0 || addedStock > 2147483647) {
+            return res.status(400).json({ error: 'Stock to add must be a positive whole number' });
         }
 
-        console.log(`[Admin] Bulk stock update: adding ${addedStock} to ${productIds.length} products`);
+        const uniqueIds = [...new Set(productIds)];
+        console.log(`[Admin] Bulk stock update: adding ${addedStock} to ${uniqueIds.length} products`);
 
         const errors = [];
-        // Update each product's stock
-        await Promise.all(productIds.map(async (pid) => {
+        let updatedCount = 0;
+        // Bound concurrent requests and only update the quantity we read. A
+        // competing inventory change becomes a conflict instead of being lost.
+        const updateProduct = async (pid) => {
             const { data: product, error: fetchErr } = await supabase
                 .from('products')
                 .select('stock')
@@ -302,7 +306,11 @@ router.put('/products/bulk-stock', async (req, res) => {
                 return;
             }
 
-            const currentStock = Number(product.stock) || 0;
+            const currentStock = Number(product.stock);
+            if (!Number.isSafeInteger(currentStock) || currentStock < 0 || currentStock + addedStock > 2147483647) {
+                errors.push(`Product ${pid}: stock is invalid or would exceed the database limit`);
+                return;
+            }
             const newStock = currentStock + addedStock;
 
             console.log(`[Admin] Updating stock for ${pid}: ${currentStock} -> ${newStock}`);
@@ -311,21 +319,31 @@ router.put('/products/bulk-stock', async (req, res) => {
                 .from('products')
                 .update({ stock: newStock, updated_at: new Date().toISOString() })
                 .eq('id', pid)
-                .select();
+                .eq('stock', currentStock)
+                .select('id');
 
             if (updateErr) {
                 errors.push(`Product ${pid}: update failed - ${updateErr.message}`);
             } else if (!updatedData || updatedData.length === 0) {
-                errors.push(`Product ${pid}: no rows updated (is RLS enabled and blocking updates?)`);
+                errors.push(`Product ${pid}: stock changed during update or no row was available`);
+            } else {
+                updatedCount++;
+            }
+        };
+        let nextIndex = 0;
+        await Promise.all(Array.from({ length: Math.min(8, uniqueIds.length) }, async () => {
+            while (nextIndex < uniqueIds.length) {
+                const pid = uniqueIds[nextIndex++];
+                await updateProduct(pid);
             }
         }));
 
         if (errors.length > 0) {
             console.error('Bulk stock update results contains errors:', errors);
-            return res.status(500).json({ error: 'Some or all products failed to update', details: errors });
+            return res.status(409).json({ error: 'Some products could not be updated. Refresh inventory before retrying.', updatedCount, failedCount: errors.length, details: errors });
         }
 
-        res.json({ message: 'Stock updated successfully' });
+        res.json({ message: 'Stock updated successfully', updatedCount });
     } catch (error) {
         console.error('Bulk stock update error:', error);
         res.status(500).json({ error: 'Failed to update stock in bulk', details: error.message });
