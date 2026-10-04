@@ -267,13 +267,23 @@ const AdminDashboard = () => {
         }
     };
 
+    const imageHostCounts = new Map();
+    products.forEach(product => {
+        const source = getImageSource(product.image_url);
+        if (source !== 'Missing' && source !== 'Fuji Card / local' && source !== 'Invalid URL') {
+            imageHostCounts.set(source, (imageHostCounts.get(source) || 0) + 1);
+        }
+    });
+    const imageHosts = [...imageHostCounts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
     const supplierMatches = products.filter(product => {
         const source = getImageSource(product.image_url);
         const matchesSource = imageSourceFilter === 'all' ||
             (imageSourceFilter === 'external' && source !== 'Missing' && source !== 'Fuji Card / local') ||
             (imageSourceFilter === 'local' && source === 'Fuji Card / local') ||
             (imageSourceFilter === 'missing' && source === 'Missing') ||
-            (imageSourceFilter === 'shared' && (imagePeersByUrl.get(product.image_url)?.length || 0) > 1);
+            (imageSourceFilter === 'shared' && (imagePeersByUrl.get(product.image_url)?.length || 0) > 1) ||
+            (imageSourceFilter.startsWith('host:') && source === imageSourceFilter.slice(5));
         const term = supplierSearch.trim().toLowerCase();
         return matchesSource && (!term || [product.name, product.id, product.set_name, product.language, source]
             .some(value => String(value || '').toLowerCase().includes(term)));
@@ -1084,7 +1094,7 @@ const AdminDashboard = () => {
                                     <div className="stat-card glass-panel"><h3>Catalog entries</h3><div className="stat-value">{products.length}</div></div>
                                     <div className="stat-card glass-panel"><h3>Recorded stock above zero</h3><div className="stat-value">{products.filter(p => Number(p.stock) > 0).length}</div></div>
                                     <div className="stat-card glass-panel"><h3>Missing images</h3><div className="stat-value">{products.filter(p => !p.image_url).length}</div></div>
-                                    <div className="stat-card glass-panel"><h3>External image sources</h3><div className="stat-value">{new Set(products.map(p => getImageSource(p.image_url)).filter(source => source !== 'Missing' && source !== 'Fuji Card / local')).size}</div></div>
+                                    <div className="stat-card glass-panel"><h3>External image sources</h3><div className="stat-value">{imageHosts.length}</div></div>
                                     <div className="stat-card glass-panel"><h3>Listings sharing an image</h3><div className="stat-value">{products.filter(p => (imagePeersByUrl.get(p.image_url)?.length || 0) > 1).length}</div></div>
                                 </div>
                                 <p>Recorded stock is the database value. Supplier availability has not been verified in this dashboard.</p>
@@ -1101,6 +1111,9 @@ const AdminDashboard = () => {
                                         <option value="local">Fuji Card / local</option>
                                         <option value="missing">Missing images</option>
                                         <option value="shared">Shared image URLs</option>
+                                        <optgroup label="External hosts">
+                                            {imageHosts.map(([host, count]) => <option key={host} value={`host:${host}`}>{host} ({count})</option>)}
+                                        </optgroup>
                                     </select>
                                 </div>
                                 <p>The CSV includes each current image URL and source. Supplier SKU, confirmed quantity, cost, lead time, image permission and quote reference remain blank for the supplier to complete. New products start at zero stock until you enter a confirmed quantity.</p>
