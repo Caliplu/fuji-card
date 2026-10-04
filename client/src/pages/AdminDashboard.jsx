@@ -457,9 +457,19 @@ const AdminDashboard = () => {
         }
     };
 
+    const reportStockError = async (error) => {
+        console.error('Stock update failed', error);
+        await fetchProducts();
+        const result = error.response?.data;
+        alert(result?.updatedCount
+            ? `${result.updatedCount} product(s) were updated, but ${result.failedCount} failed. Inventory has been refreshed; review it before retrying.`
+            : result?.error || 'Stock update failed. Inventory has been refreshed.');
+    };
+
     const handleBulkStockUpdate = async () => {
         if (selectedProducts.size === 0) return alert('Select at least one product.');
-        if (!bulkStockAdd || isNaN(bulkStockAdd) || Number(bulkStockAdd) <= 0) return alert('Enter a valid stock number to add');
+        if (!Number.isSafeInteger(Number(bulkStockAdd)) || !bulkStockAdd || Number(bulkStockAdd) <= 0) return alert('Enter a positive whole number to add.');
+        if (!window.confirm(`Add ${bulkStockAdd} units to each of ${selectedProducts.size} selected products? Confirm the received quantities first.`)) return;
 
         const token = localStorage.getItem('adminToken');
         try {
@@ -474,15 +484,14 @@ const AdminDashboard = () => {
             fetchProducts();
             alert('Bulk stock update successful!');
         } catch (error) {
-            console.error('Bulk update failed', error);
-            alert('Bulk update failed.');
+            await reportStockError(error);
         }
     };
 
     // Restock a single low-stock product
     const handleRestockSingle = async (productId) => {
-        const amount = parseInt(lowStockAmounts[productId], 10);
-        if (!amount || amount <= 0) return alert('Enter a valid quantity to add.');
+        const amount = Number(lowStockAmounts[productId]);
+        if (!Number.isSafeInteger(amount) || amount <= 0) return alert('Enter a positive whole number to add.');
         const token = localStorage.getItem('adminToken');
         try {
             await axios.put(`${API_URL}/admin/products/bulk-stock`, {
@@ -493,14 +502,13 @@ const AdminDashboard = () => {
             fetchProducts();
             alert('Stock added successfully!');
         } catch (err) {
-            console.error('Restock failed', err);
-            alert('Failed to update stock. Check server logs.');
+            await reportStockError(err);
         }
     };
 
     const handleRestockAllLowStock = async () => {
-        const amount = parseInt(bulkAllLowStock, 10);
-        if (!amount || amount <= 0) return alert('Enter a valid quantity to add.');
+        const amount = Number(bulkAllLowStock);
+        if (!Number.isSafeInteger(amount) || amount <= 0) return alert('Enter a positive whole number to add.');
 
         const lowStockIds = lowStockProducts.map(p => p.id);
 
@@ -517,8 +525,7 @@ const AdminDashboard = () => {
             fetchProducts();
             alert(`Stock successfully added to all ${lowStockIds.length} items!`);
         } catch (err) {
-            console.error('Bulk restock failed', err);
-            alert('Failed to update stock. Check server logs.');
+            await reportStockError(err);
         }
     };
 
