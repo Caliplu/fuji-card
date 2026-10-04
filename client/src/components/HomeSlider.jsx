@@ -29,9 +29,10 @@ const slides = [
   }
 ];
 
-const HomeSlider = () => {
+const HomeSlider = ({ products = [] }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const slide = slides[currentSlide];
+  const image = products.find(product => slide.link === `/product/${product.id}`)?.image || slide.image;
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -50,8 +51,9 @@ const HomeSlider = () => {
         <Link className="fuji-hero-link" to={slide.link}>{slide.label}<span aria-hidden="true"> →</span></Link>
       </div>
       <div className="fuji-hero-art">
-        <img key={slide.image} src={slide.image} alt={slide.title + ' trading card product'}
-          width="750" height="750" decoding="async" fetchPriority={currentSlide === 0 ? 'high' : 'auto'} />
+        <img key={image} src={image} alt={slide.title + ' Japanese booster box'}
+          width="750" height="750" decoding="async" fetchPriority={currentSlide === 0 ? 'high' : 'auto'}
+          onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = '/logo.png'; }} />
       </div>
       <div className="fuji-hero-dots" aria-label="Choose featured collection">
         {slides.map((item, index) => (
