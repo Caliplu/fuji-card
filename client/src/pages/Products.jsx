@@ -18,6 +18,11 @@ const Products = () => {
 
   const category = searchParams.get('category') || '';
   const search = searchParams.get('search') || '';
+  const priceLimit = 2000;
+  const priceNumber = (value, fallback) => value !== null && Number.isFinite(Number(value))
+    ? Math.max(0, Math.min(priceLimit, Number(value))) : fallback;
+  const minPrice = priceNumber(searchParams.get('minPrice'), 0);
+  const maxPrice = Math.max(minPrice, priceNumber(searchParams.get('maxPrice'), priceLimit));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -55,13 +60,15 @@ const Products = () => {
   };
 
   const handlePriceRangeChange = (range) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (range.min > 0) newParams.set('minPrice', range.min.toString());
-    else newParams.delete('minPrice');
-    if (range.max < 2000) newParams.set('maxPrice', range.max.toString());
-    else newParams.delete('maxPrice');
-    newParams.set('page', '1');
-    setSearchParams(newParams);
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (range.min > 0) next.set('minPrice', String(range.min));
+      else next.delete('minPrice');
+      if (range.max < priceLimit) next.set('maxPrice', String(range.max));
+      else next.delete('maxPrice');
+      next.set('page', '1');
+      return next;
+    });
   };
 
   const clearFilters = () => {
@@ -133,7 +140,8 @@ const Products = () => {
 
              <div className="filter-group">
                <h4>Price Range</h4>
-               <PriceRange onFilterChange={handlePriceRangeChange} maxPrice={2000} />
+               <PriceRange onFilterChange={handlePriceRangeChange} maxPrice={priceLimit}
+                 minValue={minPrice} maxValue={maxPrice} />
              </div>
           </aside>
 
