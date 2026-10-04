@@ -1,112 +1,20 @@
-.currency-dropdown-wrapper {
-  position: relative;
-  width: 100%;
-  margin: 15px 0;
-}
-
-.currency-selector-box {
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  padding: 12px 20px;
-  border-radius: 4px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  transition: border-color 0.2s;
-  user-select: none;
-}
-
-.currency-selector-box:hover {
-  border-color: #bbb;
-}
-
-.current-currency-label {
-  font-size: 14px;
-  color: #333;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-}
-
-.currency-selector-box i {
-  color: #666;
-  font-size: 12px;
-  transition: transform 0.2s;
-}
-
-.currency-selector-box i.open {
-  transform: rotate(180deg);
-}
-
-.currency-options-list {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  border-top: none;
-  border-radius: 0 0 4px 4px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  z-index: 2000;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.currency-option-item {
-  padding: 12px 20px;
-  font-size: 14px;
-  color: #444;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s;
-  border-bottom: 1px solid #f9f9f9;
-}
-
-.currency-option-item:last-child {
-  border-bottom: none;
-}
-
-.currency-option-item:hover {
-  background: #f0f7ff;
-  color: #004aad;
-}
-
-.currency-option-item.active {
-  background: #f0f7ff;
-  color: #004aad;
-  position: relative;
-}
-
-.currency-option-item.active::after {
-  content: '✓';
-  position: absolute;
-  right: 20px;
-  font-weight: 900;
-}
-
-.currency-overlay-click {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 1500;
-}
-
-@media (max-width: 768px) {
-  .currency-dropdown-wrapper {
-    margin: 10px 0;
-  }
-  
-  .currency-selector-box {
-    padding: 10px 15px;
-  }
-  
-  .current-currency-label {
-    font-size: 13px;
-  }
+.market-selector { position: relative; font-weight: 500; font-size: 13px; }
+.market-selector details > summary { display: flex; align-items: center; gap: 7px; min-height: 44px; padding: 7px 12px; border: 1px solid #d3dfef; border-radius: 8px; cursor: pointer; list-style: none; background: white; color: #123057; }
+.market-selector summary::-webkit-details-marker { display: none; }
+.market-selector summary:focus-visible, .market-selector select:focus-visible, .market-selector button:focus-visible { outline: 3px solid #f3c259; outline-offset: 2px; }
+.market-selector-panel { position: absolute; right: 0; top: 100%; z-index: 11000; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 90px); overflow-y: auto; padding: 18px; background: white; color: #19334e; border: 1px solid #dce4ed; border-radius: 12px; box-shadow: 0 12px 32px #102e5726; text-align: left; }
+.market-selector-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 16px; }
+.market-selector-heading button { min-width: 44px; min-height: 44px; border: 0; border-radius: 6px; background: #edf3fa; color: #123057; font-size: 24px; cursor: pointer; }
+.market-selector-panel label { display: block; margin: 12px 0 6px; font-weight: 650; }
+.market-selector-panel select { width: 100%; min-height: 44px; padding: 8px; border: 1px solid #b8c9df; border-radius: 6px; background: white; color: #16314f; font: inherit; }
+.market-selector-panel p { margin: 12px 0; font-size: 12px; line-height: 1.5; color: #52647a; }
+.market-selector-panel [role="status"] { color: #124782; font-weight: 650; }
+.market-selector-done { width: 100%; min-height: 44px; padding: 10px; border: 0; border-radius: 7px; background: #004aad; color: white; font: inherit; font-weight: 650; cursor: pointer; }
+.market-rate-credit { display: block; margin: 2px 0 0; font-size: 10px; line-height: 1.3; color: inherit; text-decoration: underline; }
+.market-selector-compact details > summary { min-height: 44px; padding: 4px 8px; border-color: #ffffff66; background: #ffffff14; color: white; font-size: 12px; }
+.currency-notice { margin: 14px 0; padding: 12px; border: 1px solid #d3dfef; border-radius: 8px; background: #f4f8fd; color: #254767; font-size: 13px; line-height: 1.55; }
+.currency-notice strong { display: block; }
+.currency-notice a { color: #004aad; }
+@media (max-width: 600px) {
+  .market-selector-panel { position: fixed; top: 74px; left: 12px; right: 12px; width: auto; }
 }

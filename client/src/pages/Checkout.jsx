@@ -3,6 +3,8 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
+import CurrencyNotice from '../components/CurrencyNotice';
+import { buildOrderRequest } from '../utils/orderRequest';
 import { ordersAPI, cartAPI } from '../services/api';
 import './Checkout.css';
 import './CheckoutPayment.css';
@@ -14,7 +16,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { cart, refreshCart, clearCart } = useCart();
   const { isAuthenticated, user, loading: authLoading } = useAuth();
-  const { formatPrice, convertPrice, getSymbol } = useCurrency();
+  const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -51,44 +53,7 @@ const Checkout = () => {
   const sendWhatsAppOrder = (verifiedCart) => {
     const whatsappNumber = orderWhatsAppNumber;
 
-    // Create highly professional and fully detailed order message
-    let message = `Greetings!\n`;
-    message += `I would like to place an order from Fuji Card. Below are the details of my request:\n\n`;
-
-    // Client section
-    message += `👤 *CLIENT INFORMATION*\n`;
-    message += `• Name: ${user.firstName} ${user.lastName}\n`;
-    message += `• Email: ${user.email}\n`;
-    message += `• Location: ${user.address}, ${user.city}, ${user.country}\n\n`;
-
-    // Payment Section
-    message += `💳 *PAYMENT*\n`;
-    message += `• Payment method and availability to be confirmed by the store.\n\n`;
-
-    // Items Section
-    message += `📦 *ASSET SUMMARY*\n`;
-    verifiedCart.items.forEach((item, index) => {
-      // Correctly extract nested product properties and format the prices
-      const productName = item.product?.name || item.name || 'Pokemon Card';
-      const rawPrice = Number(item.product.price);
-
-      message += `[Item ${index + 1}] *${productName}*\n`;
-      message += `   • Quantity: ${item.quantity}\n`;
-      message += `   • Unit Price: ${getSymbol()}${convertPrice(rawPrice)}\n`;
-      message += `   • Line Total: ${getSymbol()}${convertPrice(rawPrice * item.quantity)}\n\n`;
-    });
-
-    const verifiedSubtotal = verifiedCart.items.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
-
-    // Request only; the store must confirm inventory, shipping and final price.
-    message += `──────────────\n`;
-    message += `💰 *ITEMS SUBTOTAL (GBP)*\n`;
-    message += `• Listed items: ${getSymbol()}${convertPrice(verifiedSubtotal)}\n`;
-    message += `• Shipping and final amount: to be confirmed by Fuji Card\n`;
-    message += `──────────────\n\n`;
-
-    message += `Please confirm availability, shipping, and the payment method before I pay.\n`;
-    message += `Thank you!`;
+    const message = buildOrderRequest(user, verifiedCart);
 
     const whatsappUrl = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     
@@ -116,7 +81,7 @@ const Checkout = () => {
     if (!window.confirm('Are you sure you want to cancel your order? Your cart will be cleared.')) return;
     try {
       await clearCart();
-    } catch (e) {
+    } catch {
       alert('Your cart could not be cleared. Please try again.');
       return;
     }
@@ -162,10 +127,6 @@ const Checkout = () => {
 
   const subtotal = parseFloat(cart.subtotal) || 0;
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -184,10 +145,6 @@ const Checkout = () => {
     }
     if (!user?.city || !user?.city.trim()) {
       alert('Please enter your city');
-      return;
-    }
-    if (!user?.postcode || !user?.postcode.trim()) {
-      alert('Please enter your postcode');
       return;
     }
     if (!user?.country || !user?.country.trim()) {
@@ -267,7 +224,7 @@ const Checkout = () => {
                   <div className="address-display">
                     <h3>{user.firstName} {user.lastName}</h3>
                     <p>{user.address}</p>
-                    <p>{user.city}, {user.postcode}</p>
+                    <p>{[user.city, user.postcode].filter(Boolean).join(', ')}</p>
                     <p>{user.country}</p>
                     <p>📧 {user.email}</p>
                     <p>📞 {user.phone}</p>
@@ -368,7 +325,7 @@ const Checkout = () => {
                   <p>
                     {user.firstName} {user.lastName}<br />
                     {user.address}<br />
-                    {user.city}, {user.postcode}<br />
+                    {[user.city, user.postcode].filter(Boolean).join(', ')}<br />
                     {user.country}<br />
                     📧 {user.email}<br />
                     📞 {user.phone}
@@ -444,7 +401,7 @@ const Checkout = () => {
             <div className="summary-totals">
               <div className="summary-row">
                 <span>Subtotal</span>
-                <span>{getSymbol()}{convertPrice(subtotal)}</span>
+                <span>{formatPrice(subtotal)}</span>
               </div>
               <div className="summary-row">
                 <span>Shipping</span>
@@ -452,9 +409,10 @@ const Checkout = () => {
               </div>
               <div className="summary-row total">
                 <span>Items subtotal</span>
-                <span>{getSymbol()}{convertPrice(subtotal)}</span>
+                <span>{formatPrice(subtotal)}</span>
               </div>
             </div>
+            <CurrencyNotice subtotal={subtotal} />
           </div>
         </div>
       </div>
