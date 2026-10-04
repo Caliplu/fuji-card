@@ -1,106 +1,72 @@
 import { useState, useEffect, useRef } from 'react';
 import './PriceRange.css';
 
-const PriceRange = ({ onFilterChange, maxPrice = 1000000 }) => {
-  const [minPrice, setMinPrice] = useState(0);
-  const [maxPriceLocal, setMaxPriceLocal] = useState(maxPrice);
+const PriceRange = ({ onFilterChange, maxPrice = 2000, minValue = 0, maxValue = maxPrice }) => {
+  const [range, setRange] = useState({ min: minValue, max: maxValue });
   const timeoutRef = useRef(null);
+  const onFilterChangeRef = useRef(onFilterChange);
+  onFilterChangeRef.current = onFilterChange;
 
-  const handleMinChange = (e) => {
-    const value = Math.min(Number(e.target.value), maxPriceLocal - 100);
-    setMinPrice(value);
-  };
-
-  const handleMaxChange = (e) => {
-    const value = Math.max(Number(e.target.value), minPrice + 100);
-    setMaxPriceLocal(value);
-  };
-
-  // Debounced filter update - only triggers after user stops changing for 500ms
+  // Back/forward navigation and the catalog's Reset button update the URL first.
   useEffect(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
+    setRange({ min: minValue, max: maxValue });
+    clearTimeout(timeoutRef.current);
+  }, [minValue, maxValue]);
 
-    timeoutRef.current = setTimeout(() => {
-      onFilterChange({ min: minPrice, max: maxPriceLocal });
-    }, 500); // Wait 500ms after last change
+  useEffect(() => () => clearTimeout(timeoutRef.current), []);
 
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [minPrice, maxPriceLocal]);
+  const updateRange = (next) => {
+    setRange(next);
+    clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => onFilterChangeRef.current(next), 500);
+  };
 
-  const handleReset = () => {
-    setMinPrice(0);
-    setMaxPriceLocal(maxPrice);
-    onFilterChange({ min: 0, max: maxPrice });
+  const changeMin = (event) => {
+    const value = Number(event.target.value);
+    if (!Number.isFinite(value)) return;
+    updateRange({ ...range, min: Math.max(0, Math.min(value, range.max)) });
+  };
+
+  const changeMax = (event) => {
+    const value = Number(event.target.value);
+    if (!Number.isFinite(value)) return;
+    updateRange({ ...range, max: Math.min(maxPrice, Math.max(value, range.min)) });
+  };
+
+  const reset = () => {
+    clearTimeout(timeoutRef.current);
+    setRange({ min: 0, max: maxPrice });
+    onFilterChangeRef.current({ min: 0, max: maxPrice });
   };
 
   return (
     <div className="price-range-container">
       <h3 className="price-range-title">Price Range</h3>
-      
       <div className="price-inputs">
         <div className="input-group">
-          <label>Min</label>
-          <input
-            type="number"
-            value={minPrice}
-            onChange={handleMinChange}
-            min="0"
-            max={maxPriceLocal - 100}
-            step="100"
-          />
+          <label htmlFor="price-min">Min (£)</label>
+          <input id="price-min" type="number" value={range.min} onChange={changeMin}
+            min="0" max={range.max} step="1" />
         </div>
-        
-        <span className="separator">-</span>
-        
+        <span className="separator">–</span>
         <div className="input-group">
-          <label>Max</label>
-          <input
-            type="number"
-            value={maxPriceLocal}
-            onChange={handleMaxChange}
-            min={minPrice + 100}
-            max={maxPrice}
-            step="100"
-          />
+          <label htmlFor="price-max">Max (£)</label>
+          <input id="price-max" type="number" value={range.max} onChange={changeMax}
+            min={range.min} max={maxPrice} step="1" />
         </div>
       </div>
-
       <div className="price-slider">
-        <input
-          type="range"
-          min="0"
-          max={maxPrice}
-          value={minPrice}
-          onChange={handleMinChange}
-          className="slider-min"
-          step="100"
-        />
-        <input
-          type="range"
-          min="0"
-          max={maxPrice}
-          value={maxPriceLocal}
-          onChange={handleMaxChange}
-          className="slider-max"
-          step="100"
-        />
+        <input type="range" aria-label="Minimum price" min="0" max={maxPrice}
+          value={range.min} onChange={changeMin} className="slider-min" step="10" />
+        <input type="range" aria-label="Maximum price" min="0" max={maxPrice}
+          value={range.max} onChange={changeMax} className="slider-max" step="10" />
       </div>
-
       <div className="price-display">
-        <span>${minPrice.toLocaleString()}</span>
-        <span>-</span>
-        <span>${maxPriceLocal >= maxPrice ? `${maxPrice/1000}k+` : maxPriceLocal.toLocaleString()}</span>
+        <span>£{range.min.toLocaleString()}</span>
+        <span>–</span>
+        <span>{range.max >= maxPrice ? `£${(maxPrice / 1000).toLocaleString()}k+` : `£${range.max.toLocaleString()}`}</span>
       </div>
-
-      <button className="reset-btn" onClick={handleReset}>
-        Reset Filter
-      </button>
+      <button type="button" className="reset-btn" onClick={reset}>Reset Filter</button>
     </div>
   );
 };
