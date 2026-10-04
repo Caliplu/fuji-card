@@ -1,0 +1,14 @@
+.market-reference { margin: 0 0 25px; padding: 18px; border: 1px solid #dfe5ef; border-radius: 12px; background: #f7f9fc; }
+.market-reference-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.market-reference-heading h2 { font-size: 16px; color: #1a2233; margin: 0; }
+.market-reference-heading strong { color: #1a2233; font-size: 19px; }
+.market-reference p { color: #566174; font-size: 13px; line-height: 1.6; margin: 9px 0; }
+.market-reference ul { list-style: none; margin: 12px 0; padding: 0; }
+.market-reference li { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 5px 12px; padding: 10px 0; border-top: 1px solid #e0e6ef; }
+.market-reference a { color: #004aad; text-underline-offset: 3px; font-size: 14px; }
+.market-reference li strong { font-size: 14px; color: #1a2233; }
+.market-availability { grid-column: 1 / -1; font-size: 11px; color: #6b7280; }
+.market-availability.in_stock { color: #236848; }
+.market-reference small { display: block; color: #677387; font-size: 11px; line-height: 1.5; }
+.market-reference-compact { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid #e7ecf2; color: #475569; font-size: 12px; line-height: 1.6; }
+.market-reference-compact span { display: block; font-size: 10px; color: #64748b; }
