@@ -41,6 +41,7 @@ const AdminDashboard = () => {
     const [isEditing, setIsEditing] = useState(null);
     const [editForm, setEditForm] = useState({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
 
     // Users State
     const [usersList, setUsersList] = useState([]);
@@ -96,6 +97,7 @@ const AdminDashboard = () => {
 
     // File Input Ref for click-to-upload
     const fileInputRef = useRef(null);
+    const imageUploadRef = useRef(0);
     const catalogLoadedRef = useRef(false);
     const catalogRequestRef = useRef(null);
 
@@ -388,6 +390,8 @@ const AdminDashboard = () => {
 
     // Product Handlers
     const handleEditClick = (product, defaultCategory = 'pokemon') => {
+        imageUploadRef.current += 1;
+        setIsUploadingImage(false);
         setIsEditing(product.id || 'new');
         setEditForm(product.id ? { ...product } : {
             name: '', description: '', price: 0, category_name: product.category_name || selectedCategory || defaultCategory, image_url: '', stock: 0, condition: 'Mint'
@@ -428,25 +432,45 @@ const AdminDashboard = () => {
         }
     };
 
-    const handleImageUpload = (file) => {
+    const handleImageUpload = async (file) => {
         if (!file || !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
             alert('Choose a JPEG, PNG, WebP or GIF image.');
             return;
         }
-        if (file.size > 8 * 1024 * 1024) {
+        if (!file.size || file.size > 8 * 1024 * 1024) {
             alert('Choose an image smaller than 8 MB.');
             return;
         }
 
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setEditForm(prev => ({ ...prev, image_url: reader.result }));
-        };
-        reader.readAsDataURL(file);
+        const uploadId = ++imageUploadRef.current;
+        setIsUploadingImage(true);
+        try {
+            const token = localStorage.getItem('adminToken');
+            const { data } = await axios.post(`${API_URL}/admin/products/image-upload-url`, {
+                contentType: file.type, size: file.size
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            const body = new FormData();
+            body.append('cacheControl', '3600');
+            body.append('', file);
+            const response = await fetch(data.uploadUrl, { method: 'PUT', body });
+            if (!response.ok) throw new Error('Image storage rejected the upload.');
+            if (uploadId === imageUploadRef.current) {
+                setEditForm(prev => ({ ...prev, image_url: data.imageUrl }));
+            }
+        } catch (error) {
+            console.error('Product image upload failed:', error);
+            if (uploadId === imageUploadRef.current) {
+                alert(error.response?.data?.error || error.message || 'Image upload failed. Please try again.');
+            }
+        } finally {
+            if (uploadId === imageUploadRef.current) setIsUploadingImage(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     };
 
     const handleSaveProduct = async (e) => {
         e.preventDefault();
+        if (isUploadingImage) return;
         const token = localStorage.getItem('adminToken');
         try {
             setIsSaving(true);
@@ -954,7 +978,7 @@ const AdminDashboard = () => {
                                         />
                                         <div className="dropzone-placeholder">
                                             <div className="upload-icon">📸</div>
-                                            <p>{editForm.image_url ? 'Asset imported. Drag or click here to replace.' : 'Drag & Drop an image here or click to browse'}</p>
+                                            <p aria-live="polite">{isUploadingImage ? 'Uploading image…' : editForm.image_url ? 'Photo ready. Drag or click here to replace.' : 'Drag & Drop an image here or click to browse'}</p>
                                             <p className="small-text">JPEG, PNG, WebP or GIF up to 8 MB · or paste an image URL below</p>
                                         </div>
                                     </div>
@@ -962,6 +986,7 @@ const AdminDashboard = () => {
                                         name="image_url"
                                         value={editForm.image_url?.startsWith('data:') ? '' : (editForm.image_url || '')}
                                         onChange={handleFormChange}
+                                        disabled={isUploadingImage}
                                         placeholder={editForm.image_url?.startsWith('data:') ? 'Photo selected; upload on Save' : 'https://...'}
                                         style={{ marginTop: '0.5rem', width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
                                     />
@@ -971,12 +996,12 @@ const AdminDashboard = () => {
                                     <button
                                         type="submit"
                                         className="admin-btn-primary"
-                                        disabled={isSaving}
+                                        disabled={isSaving || isUploadingImage}
                                         style={{ flex: 2, background: isSaving ? '#64748b' : 'linear-gradient(135deg, #3b82f6, #2563eb)' }}
                                     >
-                                        {isSaving ? (
+                                        {isSaving || isUploadingImage ? (
                                             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                                <div className="spinner-mini"></div> Processing...
+                                                <div className="spinner-mini"></div> {isUploadingImage ? 'Uploading photo...' : 'Processing...'}
                                             </span>
                                         ) : 'Commit Changes'}
                                     </button>
