@@ -67,11 +67,12 @@ const Header = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      let url = `/products?search=${encodeURIComponent(searchQuery.trim())}`;
-      if (selectedCategory.id) {
-        url += `&category=${selectedCategory.id}`;
+      const params = new URLSearchParams({ search: searchQuery.trim() });
+      // Only the mobile overlay offers a selected category. Other search bars say All.
+      if (e.currentTarget.dataset.categoryScope === 'selected' && selectedCategory.id) {
+        params.set('category', selectedCategory.id);
       }
-      navigate(url);
+      navigate(`/products?${params}`);
       setSearchQuery('');
       setMobileMenuOpen(false); // CLOSE MENU AFTER SEARCH
       setIsMobileSearchOpen(false); // Close mobile search if open
@@ -240,7 +241,7 @@ const Header = () => {
               <i className="fa-solid fa-xmark"></i>
             </button>
             <div className="search-overlay-content">
-              <form onSubmit={handleSearch} className="mobile-search-integrated-v2">
+              <form onSubmit={handleSearch} data-category-scope="selected" className="mobile-search-integrated-v2">
                 <div className="mobile-search-all-v2" onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}>
                    {selectedCategory.name} <i className={`fa-solid fa-chevron-down ${isCategoryDropdownOpen ? 'rotated' : ''}`}></i>
                    {isCategoryDropdownOpen && (
