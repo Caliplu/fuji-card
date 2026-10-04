@@ -226,7 +226,6 @@ router.post('/checkout', requireOrderProcessing, optionalAuth, async (req, res) 
   try {
     const shippingAddress = req.body.shippingAddress || req.body.shipping_address;
     const paymentMethod = req.body.paymentMethod || req.body.payment_method;
-    const { items: manualItems } = req.body;
     const currency = 'GBP'; // Catalog prices and shipping thresholds are in GBP.
     const cartKey = req.user ? req.user.id : validGuestSession(req);
 
@@ -237,7 +236,7 @@ router.post('/checkout', requireOrderProcessing, optionalAuth, async (req, res) 
     }
 
     // Get cart
-    const { data: cart } = await supabase
+    const { data: cart, error: cartError } = await supabase
       .from('carts')
       .select(`
         *,
@@ -254,7 +253,8 @@ router.post('/checkout', requireOrderProcessing, optionalAuth, async (req, res) 
         )
       `)
       .eq('session_id', cartKey)
-      .single();
+      .maybeSingle();
+    if (cartError) throw cartError;
 
     if (!shippingAddress) {
       return res.status(400).json({ error: 'Shipping address required' });
@@ -264,74 +264,44 @@ router.post('/checkout', requireOrderProcessing, optionalAuth, async (req, res) 
     const orderItems = [];
     let subtotal = 0;
 
-    const hasDBCart = cart && cart.cart_items && cart.cart_items.length > 0;
-    const hasManualItems = manualItems && manualItems.length > 0;
-
-    if (!hasDBCart && !hasManualItems) {
+    if (!cart?.cart_items?.length) {
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
     const invalidQuantity = (quantity) => !Number.isSafeInteger(quantity) || quantity < 1;
 
-    if (hasDBCart) {
-      for (const cartItem of cart.cart_items) {
-        const product = cartItem.products;
+    for (const cartItem of cart.cart_items) {
+      const product = cartItem.products;
 
-        if (!product || invalidQuantity(cartItem.quantity)) {
-          return res.status(400).json({ error: 'Cart contains an invalid item' });
-        }
-
-        // Fetch fresh stock data to avoid cache issues
-        const { data: freshProduct } = await supabase
-          .from('products')
-          .select('id, name, price, image_url, stock')
-          .eq('id', product.id)
-          .single();
-
-        const currentProduct = freshProduct || product;
-
-        if (!Number.isFinite(Number(currentProduct.price)) || Number(currentProduct.price) < 0 ||
-            !Number.isSafeInteger(Number(currentProduct.stock)) || Number(currentProduct.stock) < cartItem.quantity) {
-          return res.status(409).json({ error: `Item unavailable: ${currentProduct.name}` });
-        }
-
-        orderItems.push({
-          product_id: currentProduct.id,
-          name: currentProduct.name,
-          price: currentProduct.price,
-          quantity: cartItem.quantity,
-          image_url: currentProduct.image_url
-        });
-
-        subtotal += Number(currentProduct.price) * cartItem.quantity;
+      if (!product || invalidQuantity(cartItem.quantity)) {
+        return res.status(400).json({ error: 'Cart contains an invalid item' });
       }
-    } else {
-      // High-resilience fallback to manualItems if DB cart is empty (local persistence fallback)
-      for (const mItem of manualItems) {
-        if (!mItem || !mItem.product_id || invalidQuantity(mItem.quantity)) {
-          return res.status(400).json({ error: 'Cart contains an invalid item' });
-        }
-        // Checkout must use the current database price and stock, not bundled
-        // catalog data which may be stale or never imported.
-        const { data: product, error: productError } = await supabase
-          .from('products').select('*').eq('id', mItem.product_id).single();
-        if (productError || !product) {
-          return res.status(409).json({ error: 'An item is unavailable; please refresh your cart' });
-        }
 
-        if (!product || !Number.isFinite(Number(product.price)) || Number(product.price) < 0 ||
-            !Number.isSafeInteger(Number(product.stock)) || Number(product.stock) < mItem.quantity) {
-          return res.status(409).json({ error: 'An item is unavailable; please refresh your cart' });
-        }
-        orderItems.push({
-          product_id: product.id,
-          name: product.name,
-          price: product.price, // Force server-side price to prevent manipulation
-          quantity: mItem.quantity,
-          image_url: product.image_url
-        });
-        subtotal += Number(product.price) * mItem.quantity;
+      // Checkout needs a fresh, successful inventory read before accepting an item.
+      const { data: currentProduct, error: productError } = await supabase
+        .from('products')
+        .select('id, name, price, image_url, stock')
+        .eq('id', product.id)
+        .single();
+
+      if (productError || !currentProduct) {
+        return res.status(409).json({ error: 'An item is unavailable; please refresh your cart' });
       }
+
+      if (!Number.isFinite(Number(currentProduct.price)) || Number(currentProduct.price) < 0 ||
+          !Number.isSafeInteger(Number(currentProduct.stock)) || Number(currentProduct.stock) < cartItem.quantity) {
+        return res.status(409).json({ error: `Item unavailable: ${currentProduct.name}` });
+      }
+
+      orderItems.push({
+        product_id: currentProduct.id,
+        name: currentProduct.name,
+        price: currentProduct.price,
+        quantity: cartItem.quantity,
+        image_url: currentProduct.image_url
+      });
+
+      subtotal += Number(currentProduct.price) * cartItem.quantity;
     }
 
     if (!orderItems.length) return res.status(400).json({ error: 'Cart is empty' });
