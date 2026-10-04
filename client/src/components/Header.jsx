@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import CurrencySelector from './CurrencySelector';
 import axios from 'axios';
 import './Header.css';
 
@@ -9,6 +10,7 @@ const API_URL = import.meta.env.VITE_API_URL || '/api';
 const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL?.trim() || '';
 
 const Header = () => {
+  const headerRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [catDropdownOpen, setCatDropdownOpen] = useState(false);
@@ -21,6 +23,20 @@ const Header = () => {
   const { user, isAuthenticated } = useAuth();
   const { cart } = useCart();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const header = headerRef.current;
+    const updateHeight = () => document.documentElement.style.setProperty('--fuji-header-height', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+    updateHeight();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateHeight) : null;
+    observer?.observe(header);
+    window.addEventListener('resize', updateHeight, { passive: true });
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateHeight);
+      if (!document.querySelector('.header-v2')) document.documentElement.style.removeProperty('--fuji-header-height');
+    };
+  }, []);
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -92,7 +108,7 @@ const Header = () => {
   };
 
   return (
-    <header className={`header-v2 ${isHeaderVisible ? 'visible' : 'hidden'}`}>
+    <header ref={headerRef} className={`header-v2 ${isHeaderVisible ? 'visible' : 'hidden'}`}>
       {/* Top Bar - Blue */}
       <div className="header-top-blue">
         <div className="container top-bar-content">
@@ -100,6 +116,7 @@ const Header = () => {
              <span>JAPANESE TCG SHOP</span>
           </div>
           <div className="top-right-mockup">
+            <CurrencySelector compact />
             <Link to="/contact" className="contact-pill">
               <i className="fa-solid fa-envelope"></i>
               CONTACT

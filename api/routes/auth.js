@@ -199,7 +199,13 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (email) updateData.email = email;
     if (address) updateData.address = address;
     if (city) updateData.city = city;
-    if (postcode) updateData.postcode = postcode;
+    // Some countries do not use postal codes; allow a customer to clear an old one.
+    if (postcode !== undefined) {
+      if (typeof postcode !== 'string' || postcode.length > 40) {
+        return res.status(400).json({ error: 'Postal code must be text of at most 40 characters' });
+      }
+      updateData.postcode = postcode.trim();
+    }
     if (country) updateData.country = country;
     if (phone) updateData.phone = phone;
 

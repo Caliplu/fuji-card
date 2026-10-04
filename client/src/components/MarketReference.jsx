@@ -6,11 +6,11 @@ const currentMarketReference = reference => (
 );
 
 const MarketReference = ({ reference, compact = false }) => {
-  const { formatPrice } = useCurrency();
+  const { formatBasePrice } = useCurrency();
   const market = currentMarketReference(reference);
   if (!market) return null;
   const range = market.low !== null
-    ? (market.low === market.high ? formatPrice(market.low) : `${formatPrice(market.low)}–${formatPrice(market.high)}`)
+    ? (market.low === market.high ? formatBasePrice(market.low) : `${formatBasePrice(market.low)}–${formatBasePrice(market.high)}`)
     : null;
   const date = new Date(`${market.checked_at}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
@@ -33,7 +33,7 @@ const MarketReference = ({ reference, compact = false }) => {
         {market.offers.map(item => (
           <li key={item.url}>
             <a href={item.url} target="_blank" rel="noopener noreferrer">{item.seller} <span aria-hidden="true">↗</span></a>
-            <strong>{formatPrice(item.amount)}</strong>
+            <strong>{formatBasePrice(item.amount)}</strong>
             <span className={`market-availability ${item.availability}`}>
               {item.availability === 'in_stock' ? 'Available when checked' : item.availability === 'coming_soon' ? 'Coming soon' : 'Sold out when checked'}
             </span>
