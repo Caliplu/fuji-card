@@ -334,7 +334,11 @@ router.put('/products/bulk-stock', async (req, res) => {
         await Promise.all(Array.from({ length: Math.min(8, uniqueIds.length) }, async () => {
             while (nextIndex < uniqueIds.length) {
                 const pid = uniqueIds[nextIndex++];
-                await updateProduct(pid);
+                try {
+                    await updateProduct(pid);
+                } catch (error) {
+                    errors.push(`Product ${pid}: ${error.message || 'request failed'}`);
+                }
             }
         }));
 
