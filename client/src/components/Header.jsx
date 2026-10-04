@@ -13,7 +13,6 @@ const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [catDropdownOpen, setCatDropdownOpen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
   const [categories, setCategories] = useState([]);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -24,18 +23,26 @@ const Header = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let frame = 0;
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        setIsHeaderVisible(false);
-      } else {
-        setIsHeaderVisible(true);
-      }
-      setLastScrollY(currentScrollY);
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const currentScrollY = window.scrollY;
+        const movement = currentScrollY - lastScrollY;
+        if (currentScrollY <= 100) setIsHeaderVisible(true);
+        else if (movement > 8) setIsHeaderVisible(false);
+        else if (movement < -8) setIsHeaderVisible(true);
+        if (Math.abs(movement) > 8 || currentScrollY <= 100) lastScrollY = currentScrollY;
+      });
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchCategories = async () => {
