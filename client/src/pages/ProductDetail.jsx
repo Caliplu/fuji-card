@@ -4,6 +4,8 @@ import { productsAPI } from '../services/api';
 import { useCart } from '../context/CartContext';
 import { useCurrency } from '../context/CurrencyContext';
 import ProductCard from '../components/ProductCard';
+import ProductGallery from '../components/ProductGallery';
+import MarketReference from '../components/MarketReference';
 import './ProductDetail.css';
 
 const ProductDetail = () => {
@@ -14,7 +16,6 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [imageError, setImageError] = useState(false);
   const { addToCart } = useCart();
   const { formatPrice } = useCurrency();
 
@@ -22,7 +23,6 @@ const ProductDetail = () => {
     const controller = new AbortController();
     const fetchProduct = async () => {
       setLoading(true);
-      setImageError(false);
       setQuantity(1);
       try {
         const response = await productsAPI.getOne(id, { signal: controller.signal });
@@ -49,7 +49,7 @@ const ProductDetail = () => {
       setAdding(true);
       await addToCart(product.id, quantity);
       alert('Added to cart!');
-    } catch (error) {
+    } catch {
       alert('Failed to add to cart');
     } finally {
       setAdding(false);
@@ -79,8 +79,6 @@ const ProductDetail = () => {
     );
   }
 
-  const placeholderImage = '/logo.png';
-
   return (
     <div className="product-detail-page">
       <div className="container">
@@ -96,34 +94,21 @@ const ProductDetail = () => {
 
         <div className="product-detail">
           <div className="product-image-section">
-            <div className="main-image">
-              <img 
-                src={imageError ? placeholderImage : (product.image || product.image_url || placeholderImage)} 
-                alt={product.name}
-                width="600"
-                height="780"
-                decoding="async"
-                onError={() => setImageError(true)}
-              />
-              {product.stock <= 3 && product.stock > 0 && (
-                <span className="stock-badge low">Only {product.stock} left!</span>
-              )}
-              {product.featured && (
-                <span className="featured-badge">Featured</span>
-              )}
-            </div>
+            <ProductGallery key={product.id} product={product} />
           </div>
 
           <div className="product-info-section">
             <span className="product-category">{product.category}</span>
             <h1 className="product-title">{product.name}</h1>
             
+            <span className="store-price-label">Fuji Card price</span>
             <div className="product-price-large">{formatPrice(product.price)}</div>
+            <MarketReference reference={product.market_reference} />
             
             <div className="product-attributes">
               <div className="attribute">
                 <span className="label">Set:</span>
-                <span className="value">{product.set || product.set_name || 'N/A'}</span>
+                <span className="value">{product.catalog_reference?.set || product.set || product.set_name || 'N/A'}</span>
               </div>
               <div className="attribute">
                 <span className="label">Rarity:</span>
@@ -141,6 +126,10 @@ const ProductDetail = () => {
                 <span className="label">Card Type:</span>
                 <span className="value">{product.cardType || product.card_type || 'Character'}</span>
               </div>
+              {product.catalog_reference?.packs_per_box && <div className="attribute">
+                <span className="label">Box contents:</span>
+                <span className="value">{product.catalog_reference.packs_per_box} packs · {product.catalog_reference.cards_per_pack} cards per pack</span>
+              </div>}
             </div>
 
             <div className="product-description">

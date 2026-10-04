@@ -102,6 +102,8 @@
   margin-bottom: 25px;
 }
 
+.store-price-label { display: block; color: #64748b; font-size: 12px; margin-bottom: 4px; }
+
 .product-attributes {
   display: grid;
   grid-template-columns: 1fr 1fr;

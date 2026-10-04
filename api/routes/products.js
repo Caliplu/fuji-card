@@ -1,5 +1,6 @@
 import express from 'express';
 import { supabase } from '../config/supabase.js';
+import { CURATED_PRODUCT_IDS, enrichCatalogProduct, getCatalogEvidence } from '../data/catalog-evidence.js';
 
 const router = express.Router();
 const typeTerms = {
@@ -17,7 +18,7 @@ const typeTerms = {
   mtg: { name: ['magic', 'mtg'], description: ['magic', 'mtg'] }
 };
 const toStoreProduct = (product) => ({
-  ...product,
+  ...enrichCatalogProduct(product),
   category: product.categories?.name || 'other',
   image: product.image_url,
   set: product.set_name,
@@ -32,6 +33,20 @@ router.use((req, res, next) => {
 });
 
 // This route must precede /:id.
+router.get('/highlights', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('products')
+      .select('*, categories(id, name)').in('id', CURATED_PRODUCT_IDS);
+    if (error) throw error;
+    const products = (data || []).filter(getCatalogEvidence)
+      .sort((a, b) => CURATED_PRODUCT_IDS.indexOf(a.id) - CURATED_PRODUCT_IDS.indexOf(b.id));
+    res.json({ products: products.map(toStoreProduct) });
+  } catch (error) {
+    console.error('Product highlights error:', error);
+    res.status(503).json({ error: 'Product highlights temporarily unavailable' });
+  }
+});
+
 router.get('/filters/options', async (req, res) => {
   try {
     let query = supabase.from('products')
