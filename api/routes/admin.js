@@ -260,18 +260,22 @@ router.post('/products', async (req, res) => {
         }
 
         // Ensure you use the right category_id - for now assume client sends it or map name -> id
-        if (newProduct.category_name) {
-            const { data: catData } = await supabase
+        if (newProduct.category_name !== undefined) {
+            if (typeof newProduct.category_name !== 'string' || !newProduct.category_name.trim()) {
+                return res.status(400).json({ error: 'Select an existing category.' });
+            }
+            const { data: catData, error: categoryError } = await supabase
                 .from('categories')
                 .select('id')
                 .ilike('name', newProduct.category_name.trim())
-                .single();
+                .maybeSingle();
+            if (categoryError) throw categoryError;
 
             if (catData) {
                 console.log(`[Admin] Map category '${newProduct.category_name}' to ID: ${catData.id}`);
                 newProduct.category_id = catData.id;
             } else {
-                console.warn(`[Admin] Category '${newProduct.category_name}' NOT FOUND in DB! Product might not appear.`);
+                return res.status(400).json({ error: 'Category not found. Select an existing category.' });
             }
             delete newProduct.category_name;
         }
@@ -388,17 +392,21 @@ router.put('/products/:id', async (req, res) => {
             updateData.stock = stockValue;
         }
 
-        if (updateData.category_name) {
-            const { data: catData } = await supabase
+        if (updateData.category_name !== undefined) {
+            if (typeof updateData.category_name !== 'string' || !updateData.category_name.trim()) {
+                return res.status(400).json({ error: 'Select an existing category.' });
+            }
+            const { data: catData, error: categoryError } = await supabase
                 .from('categories')
                 .select('id')
                 .ilike('name', updateData.category_name.trim())
-                .single();
+                .maybeSingle();
+            if (categoryError) throw categoryError;
             if (catData) {
                 console.log(`[Admin] Map category '${updateData.category_name}' to ID: ${catData.id}`);
                 updateData.category_id = catData.id;
             } else {
-                console.warn(`[Admin] Category '${updateData.category_name}' NOT FOUND in DB! Product might not appear.`);
+                return res.status(400).json({ error: 'Category not found. Select an existing category.' });
             }
             delete updateData.category_name;
         }
