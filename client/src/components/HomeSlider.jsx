@@ -7,25 +7,25 @@ const slides = [
     image: '/M4-bb-750x750.webp',
     eyebrow: 'Pokémon TCG',
     title: 'Ninja Spinner',
-    description: 'Explore Japanese Pokémon cards and sealed products.',
-    link: '/products?search=ninja',
-    label: 'Explore Pokémon'
+    description: 'Explore the Japanese Ninja Spinner booster box.',
+    link: '/product/jp-m4-bb',
+    label: 'View booster box'
   },
   {
     image: '/M2a-bb-750x750.webp',
     eyebrow: 'Pokémon TCG',
     title: 'Mega Dream ex',
-    description: 'Find standout cards and boxes for your collection.',
-    link: '/products?search=mega',
-    label: 'Browse the collection'
+    description: 'Explore the Japanese Mega Dream ex booster box.',
+    link: '/product/jp-m2a-bb',
+    label: 'View booster box'
   },
   {
     image: '/OP-15-bb-750x750.webp.webp',
     eyebrow: 'One Piece Card Game',
-    title: 'One Piece',
-    description: 'Explore cards and sealed products from the One Piece collection.',
-    link: '/products?category=onepiece',
-    label: 'Explore One Piece'
+    title: 'Adventure on KAMI’s Island',
+    description: 'Explore the OP-15 Japanese One Piece booster box.',
+    link: '/product/jp-op15-bb',
+    label: 'View booster box'
   }
 ];
 
