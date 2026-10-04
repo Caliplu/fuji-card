@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase.js';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../config/auth.js';
 import multer from 'multer';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -187,6 +188,28 @@ const authenticateAdmin = (req, res, next) => {
 
 // Apply middleware to all admin routes
 router.use(authenticateAdmin);
+
+// Send only a short-lived upload grant through Vercel; the image bytes go
+// directly from the administrator's browser to Supabase Storage.
+router.post('/products/image-upload-url', async (req, res) => {
+    try {
+        if (!supabase) return res.status(503).json({ error: 'Image storage is temporarily unavailable' });
+        const imageTypes = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+        const { contentType, size } = req.body;
+        if (!imageTypes[contentType] || !Number.isSafeInteger(size) || size < 1 || size > 8 * 1024 * 1024) {
+            return res.status(400).json({ error: 'Choose a JPEG, PNG, WebP or GIF image smaller than 8 MB.' });
+        }
+        const path = `products/${crypto.randomUUID()}.${imageTypes[contentType]}`;
+        const { data, error } = await supabase.storage.from('products').createSignedUploadUrl(path);
+        if (error || !data?.signedUrl) throw error || new Error('Signed upload URL missing');
+        const { data: publicData } = supabase.storage.from('products').getPublicUrl(path);
+        if (!publicData?.publicUrl) throw new Error('Public image URL missing');
+        res.json({ uploadUrl: data.signedUrl, imageUrl: publicData.publicUrl });
+    } catch (error) {
+        console.error('Admin image upload URL error:', error);
+        res.status(502).json({ error: 'Could not prepare the image upload. Please try again.' });
+    }
+});
 
 // Get global stats
 router.get('/stats', async (req, res) => {
