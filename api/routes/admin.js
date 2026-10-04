@@ -578,7 +578,7 @@ router.get('/orders', async (req, res) => {
     }
 });
 
-// Get recent transactions for notifications
+// Get recent orders for notifications
 router.get('/notifications', async (req, res) => {
     try {
         // Fetch the 10 most recent orders with their associated users if any
@@ -590,6 +590,7 @@ router.get('/notifications', async (req, res) => {
                 total,
                 currency,
                 payment_method,
+                status,
                 created_at,
                 user_id,
                 users ( username, email )
@@ -606,6 +607,7 @@ router.get('/notifications', async (req, res) => {
             amount: order.total,
             currency: order.currency,
             method: order.payment_method || 'Unknown',
+            status: order.status,
             time: order.created_at,
             customer: order.users ? order.users.username : 'Guest Checkout',
             email: order.users ? order.users.email : 'N/A',

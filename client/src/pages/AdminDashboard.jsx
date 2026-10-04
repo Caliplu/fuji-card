@@ -763,11 +763,14 @@ const AdminDashboard = () => {
                                             <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{new Date(notif.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0.2rem 0' }}>
-                                            <span style={{ fontSize: '0.9rem', color: '#e2e8f0' }}>Paid: <strong style={{ color: '#fff' }}>{notif.currency} {notif.amount}</strong></span>
+                                            <span style={{ fontSize: '0.9rem', color: '#e2e8f0' }}>Order total: <strong style={{ color: '#fff' }}>{notif.currency} {Number(notif.amount).toFixed(2)}</strong></span>
                                             <span style={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 'bold', padding: '0.2rem 0.5rem', borderRadius: '4px', background: ['crypto', 'cryptocurrency', 'cryptomus'].includes(notif.method) ? 'rgba(251, 191, 36, 0.2)' : 'rgba(167, 139, 250, 0.2)', color: ['crypto', 'cryptocurrency', 'cryptomus'].includes(notif.method) ? '#fbbf24' : '#a78bfa' }}>
                                                 {notif.method}
                                             </span>
                                         </div>
+                                        <span style={{ fontSize: '0.8rem', color: notif.status === 'completed' ? '#4ade80' : '#facc15', textTransform: 'capitalize' }}>
+                                            Status: {String(notif.status || 'Unknown').replaceAll('_', ' ')}
+                                        </span>
                                         {notif.email && notif.email !== 'N/A' && (
                                             <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{notif.email}</span>
                                         )}
@@ -1492,7 +1495,7 @@ const AdminDashboard = () => {
                                     <tr>
                                         <th>Order Number</th>
                                         <th>Customer</th>
-                                        <th>Total Paid</th>
+                                        <th>Order Total</th>
                                         <th>Date/Time</th>
                                         <th>Status</th>
                                         <th>Method</th>
@@ -1522,14 +1525,14 @@ const AdminDashboard = () => {
                                             </td>
                                             <td>
                                                 <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: order.payment_method === 'crypto' || order.payment_method === 'cryptocurrency' ? 'rgba(251, 191, 36, 0.2)' : 'rgba(167, 139, 250, 0.2)', color: order.payment_method === 'crypto' || order.payment_method === 'cryptocurrency' ? '#fbbf24' : '#a78bfa' }}>
-                                                    {order.payment_method || 'card'}
+                                                    {order.payment_method || 'Not selected'}
                                                 </span>
                                             </td>
                                         </tr>
                                     ))}
                                     {ordersList.length === 0 && (
                                         <tr>
-                                            <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No completed transactions yet.</td>
+                                            <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No orders yet.</td>
                                         </tr>
                                     )}
                                 </tbody>
