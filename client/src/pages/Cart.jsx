@@ -1,16 +1,17 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useCurrency } from '../context/CurrencyContext';
+import CurrencyNotice from '../components/CurrencyNotice';
 import './Cart.css';
 
 const Cart = () => {
   const { cart, loading, updateQuantity, removeFromCart, clearCart } = useCart();
-  const { formatPrice, convertPrice, getSymbol } = useCurrency();
+  const { formatPrice } = useCurrency();
 
   const handleQuantityChange = async (itemId, newQuantity) => {
     try {
       await updateQuantity(itemId, newQuantity);
-    } catch (error) {
+    } catch {
       alert('Failed to update quantity');
     }
   };
@@ -18,7 +19,7 @@ const Cart = () => {
   const handleRemove = async (itemId) => {
     try {
       await removeFromCart(itemId);
-    } catch (error) {
+    } catch {
       alert('Failed to remove item');
     }
   };
@@ -27,7 +28,7 @@ const Cart = () => {
     if (window.confirm('Are you sure you want to clear your cart?')) {
       try {
         await clearCart();
-      } catch (error) {
+      } catch {
         alert('Failed to clear cart');
       }
     }
@@ -134,7 +135,7 @@ const Cart = () => {
             <h2>Order Summary</h2>
             <div className="summary-row">
               <span>Subtotal ({cart.itemCount} items)</span>
-              <span>{getSymbol()}{convertPrice(subtotal)}</span>
+              <span>{formatPrice(subtotal)}</span>
             </div>
             <div className="summary-row">
               <span>Shipping</span>
@@ -142,13 +143,14 @@ const Cart = () => {
             </div>
             <div className="summary-total">
               <span>Items subtotal</span>
-              <span>{getSymbol()}{convertPrice(subtotal)}</span>
+              <span>{formatPrice(subtotal)}</span>
             </div>
             {hasUnavailableItems ? (
               <p role="status">Remove unavailable products before checkout.</p>
             ) : (
               <Link to="/checkout" className="checkout-btn">Proceed to Checkout</Link>
             )}
+            <CurrencyNotice subtotal={subtotal} />
             <Link to="/products" className="continue-shopping">
               Continue Shopping
             </Link>

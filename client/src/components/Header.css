@@ -13,6 +13,22 @@
   transform: translateY(-100%);
 }
 
+body:has(.header-v2) { padding-top: var(--fuji-header-height, 175px) !important; }
+
+.header-v2:focus-within, .header-v2:has(.market-selector details[open]) {
+  transform: translateY(0);
+}
+
+.header-top-blue:has(.market-selector) { padding: 5px 0; }
+
+@media (max-width: 600px) {
+  body:has(.header-v2) { padding-top: var(--fuji-header-height, 145px) !important; }
+  .header-top-blue .top-right-mockup { gap: 8px; }
+  .header-top-blue .contact-pill, .header-top-blue .social-nodes { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) { .header-v2 { transition: none; } }
+
 .container {
   max-width: 1320px;
   margin: 0 auto;

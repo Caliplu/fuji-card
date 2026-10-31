@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test api/tests/*.test.js client/tests/*.test.js client/tests/*.test.mjs",
     "build": "sh -c 'cd client && npm install && npm run build && cd .. && rm -rf dist && mv client/dist dist'",
     "install:server": "cd server && npm install",
     "install:client": "cd client && npm install",

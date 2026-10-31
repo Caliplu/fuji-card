@@ -2,26 +2,27 @@ import { useState, useEffect } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { COUNTRIES } from '../../../shared/markets.js';
 import { ordersAPI } from '../services/api';
 import './Account.css';
 import './AccountTransactions.css';
 
 const Account = () => {
   const { user, isAuthenticated, loading: authLoading, logout, updateProfile } = useAuth();
-  const { formatPrice } = useCurrency();
+  const { formatOrderPrice } = useCurrency();
   const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'orders');
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(searchParams.get('tab') === 'profile');
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    address: '',
-    city: '',
-    postcode: '',
-    country: 'United Kingdom',
-    phone: '',
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    email: user?.email || '',
+    address: user?.address || '',
+    city: user?.city || '',
+    postcode: user?.postcode || '',
+    country: user?.country || 'United Kingdom',
+    phone: user?.phone || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -150,10 +151,14 @@ const Account = () => {
     return colors[status] || '#666';
   };
 
-  // Calculate total transaction value for minimum check
-  const getTotalTransactionValue = () => {
-    return transactions.reduce((sum, t) => sum + parseFloat(t.total || 0), 0);
-  };
+  // Historical orders retain their recorded currency when display preferences change.
+  const orderValueByCurrency = transactions.reduce((totals, order) => {
+    const code = order.currency || 'GBP';
+    totals[code] = (totals[code] || 0) + (Number(order.total) || 0);
+    return totals;
+  }, {});
+  const orderValueLabel = Object.entries(orderValueByCurrency)
+    .map(([code, total]) => formatOrderPrice(total, code)).join(' · ') || formatOrderPrice(0);
 
   return (
     <div className="account-page">
@@ -243,7 +248,7 @@ const Account = () => {
                         </div>
                         <div className="order-footer">
                           <span className="order-total">
-                            Total: {formatPrice(parseFloat(order.total))}
+                            Total: {formatOrderPrice(order.total, order.currency || 'GBP')}
                           </span>
                         </div>
                       </div>
@@ -264,7 +269,7 @@ const Account = () => {
                     </div>
                     <div className="stat-card">
                       <span className="stat-label">Order value</span>
-                      <span className="stat-value">{formatPrice(getTotalTransactionValue())}</span>
+                      <span className="stat-value">{orderValueLabel}</span>
                     </div>
                   </div>
                 </div>
@@ -311,7 +316,7 @@ const Account = () => {
                                 <div className="mini-item-info">
                                   <span className="mini-item-name">{item.name}</span>
                                   <span className="mini-item-details">
-                                    Qty: {item.quantity} × {formatPrice(parseFloat(item.price))}
+                                    Qty: {item.quantity} × {formatOrderPrice(item.price, transaction.currency || 'GBP')}
                                   </span>
                                 </div>
                               </div>
@@ -338,12 +343,12 @@ const Account = () => {
                             </div>
                             <div className="detail-row">
                               <span className="label">Subtotal:</span>
-                              <span className="value">{formatPrice(parseFloat(transaction.subtotal))}</span>
+                              <span className="value">{formatOrderPrice(transaction.subtotal, transaction.currency || 'GBP')}</span>
                             </div>
                             <div className="detail-row">
                               <span className="label">Shipping:</span>
                               <span className="value">
-                                {parseFloat(transaction.shipping_cost) === 0 ? 'FREE' : formatPrice(parseFloat(transaction.shipping_cost))}
+                                {parseFloat(transaction.shipping_cost) === 0 ? 'FREE' : formatOrderPrice(transaction.shipping_cost, transaction.currency || 'GBP')}
                               </span>
                             </div>
                           </div>
@@ -368,7 +373,7 @@ const Account = () => {
                                       <p>📞 {address.phone}</p>
                                     </>
                                   ) : null;
-                                } catch (e) {
+                                } catch {
                                   return <p>Address information available</p>;
                                 }
                               })()}
@@ -379,7 +384,7 @@ const Account = () => {
                         <div className="transaction-footer">
                           <div className="transaction-summary">
                             <span className="transaction-total">
-                              Total: {formatPrice(parseFloat(transaction.total))}
+                              Total: {formatOrderPrice(transaction.total, transaction.currency || 'GBP')}
                             </span>
                             <div className="transaction-actions">
                               <button className="btn-small">View Details</button>
@@ -455,30 +460,31 @@ const Account = () => {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Postcode</label>
+                      <label htmlFor="profile-postcode">Postal code (if used in your country)</label>
                       <input
+                        id="profile-postcode"
                         type="text"
+                        autoComplete="postal-code"
                         value={formData.postcode || ''}
                         onChange={(e) => setFormData({ ...formData, postcode: e.target.value })}
                         disabled={!editing}
-                        required
                       />
                     </div>
                   </div>
 
                   <div className="form-group">
-                    <label>Country</label>
+                    <label htmlFor="profile-country">Country or territory</label>
                     <select
+                      id="profile-country"
+                      autoComplete="country-name"
                       value={formData.country || ''}
                       onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                       disabled={!editing}
                       required
                     >
-                      <option>United Kingdom</option>
-                      <option>United States</option>
-                      <option>Germany</option>
-                      <option>France</option>
-                      <option>Japan</option>
+                      {formData.country && !COUNTRIES.some(country => country.name === formData.country) &&
+                        <option value={formData.country}>{formData.country}</option>}
+                      {COUNTRIES.map(country => <option key={country.code} value={country.name}>{country.name}</option>)}
                     </select>
                   </div>
 

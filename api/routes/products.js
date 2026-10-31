@@ -1,6 +1,7 @@
 import express from 'express';
 import { supabase } from '../config/supabase.js';
 import { CURATED_PRODUCT_IDS, enrichCatalogProduct, getCatalogEvidence } from '../data/catalog-evidence.js';
+import { applyCatalogFacets, catalogFilterOptions } from '../utils/catalog-filters.js';
 
 const router = express.Router();
 const typeTerms = {
@@ -50,13 +51,11 @@ router.get('/highlights', async (req, res) => {
 router.get('/filters/options', async (req, res) => {
   try {
     let query = supabase.from('products')
-      .select('rarity, condition, language, set_name, categories!inner(name)');
+      .select('rarity, condition, language, set_name, card_type, price, categories!inner(name)');
     if (req.query.category) query = query.eq('categories.name', req.query.category);
     const { data, error } = await query;
     if (error) throw error;
-    const values = (key) => [...new Set(data.map(p => p[key]).filter(Boolean))];
-    res.json({ rarities: values('rarity'), conditions: values('condition'),
-      languages: values('language'), sets: values('set_name') });
+    res.json(catalogFilterOptions(data || []));
   } catch (error) {
     console.error('Product filters error:', error);
     res.status(503).json({ error: 'Product filters temporarily unavailable' });
@@ -65,8 +64,7 @@ router.get('/filters/options', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const { category, search, type, minPrice, maxPrice, rarity, condition,
-      language, set, sort, featured } = req.query;
+    const { category, search, type, minPrice, maxPrice, sort, featured } = req.query;
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(1000, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
     let query = supabase.from('products')
@@ -88,10 +86,7 @@ router.get('/', async (req, res) => {
     else if (searchFilter || typeFilter) query = query.or(searchFilter || typeFilter);
     if (minPrice && Number.isFinite(Number(minPrice))) query = query.gte('price', Number(minPrice));
     if (maxPrice && Number.isFinite(Number(maxPrice))) query = query.lte('price', Number(maxPrice));
-    if (rarity) query = query.eq('rarity', rarity);
-    if (condition) query = query.eq('condition', condition);
-    if (language) query = query.eq('language', language);
-    if (set) query = query.eq('set_name', set);
+    query = applyCatalogFacets(query, req.query);
     if (featured === 'true') query = query.eq('featured', true);
 
     const sortColumns = {
@@ -99,7 +94,7 @@ router.get('/', async (req, res) => {
       name_asc: ['name', true], name_desc: ['name', false]
     };
     const [column, ascending] = sortColumns[sort] || ['created_at', false];
-    query = query.order(column, { ascending })
+    query = query.order(column, { ascending }).order('id', { ascending: true })
       .range((page - 1) * limit, page * limit - 1);
 
     const { data, error, count } = await query;

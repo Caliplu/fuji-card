@@ -10,6 +10,7 @@ import orderRoutes from './routes/orders.js';
 import categoryRoutes from './routes/categories.js';
 import adminRoutes from './routes/admin.js';
 import { supabase } from './config/supabase.js';
+import { COUNTRIES, CURRENCIES, BASE_CURRENCY } from '../shared/markets.js';
 
 console.log('Backend starting up...');
 process.on('uncaughtException', (err) => {
@@ -43,9 +44,12 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
 
-// The catalog is denominated in GBP. No unverified conversion quotes.
+// Country/currency metadata only. Customers fetch conversion rates directly from the provider.
 app.get('/api/currencies', (req, res) => {
-  res.json({ rates: { GBP: 1 }, currencies: ['GBP'] });
+  res.json({ base: BASE_CURRENCY, rates: { GBP: 1 }, currencies: CURRENCIES.map(item => item.code),
+    currencyDetails: CURRENCIES, countries: COUNTRIES,
+    conversion: { url: 'https://open.er-api.com/v6/latest/GBP', attribution: 'https://www.exchangerate-api.com',
+      estimatesOnly: true }, checkoutCurrency: BASE_CURRENCY });
 });
 
 // Health check

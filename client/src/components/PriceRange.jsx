@@ -5,14 +5,9 @@ const PriceRange = ({ onFilterChange, maxPrice = 2000, minValue = 0, maxValue = 
   const [range, setRange] = useState({ min: minValue, max: maxValue });
   const timeoutRef = useRef(null);
   const onFilterChangeRef = useRef(onFilterChange);
-  onFilterChangeRef.current = onFilterChange;
+  useEffect(() => { onFilterChangeRef.current = onFilterChange; }, [onFilterChange]);
 
-  // Back/forward navigation and the catalog's Reset button update the URL first.
-  useEffect(() => {
-    setRange({ min: minValue, max: maxValue });
-    clearTimeout(timeoutRef.current);
-  }, [minValue, maxValue]);
-
+  // Products remounts this draft input when the URL changes, cancelling a pending edit.
   useEffect(() => () => clearTimeout(timeoutRef.current), []);
 
   const updateRange = (next) => {
@@ -41,7 +36,7 @@ const PriceRange = ({ onFilterChange, maxPrice = 2000, minValue = 0, maxValue = 
 
   return (
     <div className="price-range-container">
-      <h3 className="price-range-title">Price Range</h3>
+      <h3 className="price-range-title">Price Range (GBP)</h3>
       <div className="price-inputs">
         <div className="input-group">
           <label htmlFor="price-min">Min (£)</label>

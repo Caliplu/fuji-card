@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import HomeSlider from '../components/HomeSlider';
 import PremiumProductCard from '../components/PremiumProductCard';
-import CurrencySelector from '../components/CurrencySelector';
+import { useCurrency } from '../context/CurrencyContext';
 import MarketReference from '../components/MarketReference';
 import './Home.css';
 
@@ -15,6 +15,7 @@ const collections = [
 ];
 
 const Home = () => {
+  const { formatPrice } = useCurrency();
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [highlights, setHighlights] = useState([]);
   const [highlightError, setHighlightError] = useState(false);
@@ -42,13 +43,6 @@ const Home = () => {
 
   return (
     <div className="home-page-container">
-      {/* Top Controls Row */}
-      <div className="home-top-bar">
-        <div className="container">
-          <CurrencySelector />
-        </div>
-      </div>
-
       {/* Main Announcement Slider */}
       <div className="home-main-hero">
         <div className="container">
@@ -77,7 +71,7 @@ const Home = () => {
                 <div className="catalog-showcase-info">
                   <h3>{product.catalog_reference.name}</h3>
                   <p>{product.catalog_reference.packs_per_box} packs · {product.catalog_reference.cards_per_pack} cards per pack</p>
-                  <div className="catalog-showcase-price"><span>Fuji Card</span><strong>£{Number(product.price).toFixed(2)}</strong></div>
+                  <div className="catalog-showcase-price"><span>Fuji Card</span><strong>{formatPrice(product.price)}</strong></div>
                   {product.stock === 0 && <span className="catalog-showcase-sold-out">Sold out</span>}
                   <MarketReference reference={product.market_reference} compact />
                   <span className="catalog-showcase-link">Photos & details <span aria-hidden="true">↗</span></span>

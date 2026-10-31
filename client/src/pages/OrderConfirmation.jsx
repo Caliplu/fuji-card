@@ -4,7 +4,7 @@ import './OrderConfirmation.css';
 
 const OrderConfirmation = () => {
   const location = useLocation();
-  const { formatPrice } = useCurrency();
+  const { formatOrderPrice } = useCurrency();
   const order = location.state?.order;
 
   if (!order) {
@@ -32,7 +32,7 @@ const OrderConfirmation = () => {
             </div>
             <div className="detail-row">
               <span>Order Total</span>
-              <span className="order-total">{formatPrice(parseFloat(order.total))}</span>
+              <span className="order-total">{formatOrderPrice(order.total, order.currency || 'GBP')}</span>
             </div>
             <div className="detail-row">
               <span>Status</span>
